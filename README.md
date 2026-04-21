@@ -80,14 +80,21 @@ python generate.py --model flux --count 1
 
 # Reproducible — seed N is the base; image i gets seed N+i
 python generate.py --seed 42 --count 4
+
+# Run indefinitely. Every completed image is saved to disk immediately;
+# press Ctrl-C at any time and keep whatever's already there.
+python generate.py --forever
 ```
 
 Everything lands in `output/` as `TIMESTAMP_category_slug_sSEED.png` plus a JSON sidecar containing the exact prompt, seed, model, and steps for reproducibility.
+
+When `--forever` is on, each image gets a fresh random seed (so an overnight run keeps varying) unless you pass `--seed N`, in which case seeds are `N, N+1, N+2, …` — fully reproducible. On Ctrl-C the script prints `[interrupted] Stopped after N image(s)` and exits cleanly.
 
 ### All flags
 
 ```
 --count N               How many images (default 1)
+--forever               Generate indefinitely until Ctrl-C (overrides --count)
 --model {sdxl-refined,sdxl-base,juggernaut,flux}
 --category NAME         Restrict to a single category
 --prompt "…"            Skip the prompt bank entirely

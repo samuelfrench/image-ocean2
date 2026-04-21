@@ -12,3 +12,4 @@
 - [x] 2026-04-20 — SDXL base + refiner two-stage pipeline at 5.3s / 1024×1024 on RTX 4090.
 - [x] 2026-04-20 — Juggernaut-XL v9 and FLUX.1-schnell pipelines wired behind `--model` flag.
 - [x] 2026-04-20 — Repo pushed to GitHub as public.
+- [x] 2026-04-20 — `--forever` flag with graceful Ctrl-C handling; fresh seed per image when unseeded.

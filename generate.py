@@ -302,6 +302,11 @@ def build_parser() -> argparse.ArgumentParser:
     )
     p.add_argument("--count", type=int, default=1, help="Number of images to generate.")
     p.add_argument(
+        "--forever",
+        action="store_true",
+        help="Generate images indefinitely until interrupted (Ctrl-C). Overrides --count.",
+    )
+    p.add_argument(
         "--model",
         choices=["sdxl-refined", "sdxl-base", "juggernaut", "flux"],
         default="sdxl-refined",
@@ -380,38 +385,63 @@ def main(argv: list[str] | None = None) -> int:
     pipes = load_pipelines(args.model, ckpts, dtype)
 
     rng = random.Random(args.seed)
-    base_seed = args.seed if args.seed is not None else _draw_seed(rng)
 
+    def _index_stream():
+        if args.forever:
+            i = 0
+            while True:
+                yield i
+                i += 1
+        else:
+            yield from range(args.count)
+
+    count_label = "∞" if args.forever else str(args.count)
+    seed_label = "random-per-image" if args.seed is None else str(args.seed)
     print(
-        f"[run] model={args.model} count={args.count} seed={base_seed} "
+        f"[run] model={args.model} count={count_label} seed={seed_label} "
         f"size={args.width}x{args.height} steps={args.steps}",
         flush=True,
     )
+    if args.forever:
+        print("[run] Press Ctrl-C to stop; all completed images remain on disk.", flush=True)
 
-    for i in range(args.count):
-        if args.prompt:
-            prompt = Prompt(category="custom", subject=args.prompt)
-        else:
-            prompt = get_random_prompt(args.category, rng)
-        seed = base_seed + i
+    made = 0
+    try:
+        for i in _index_stream():
+            if args.prompt:
+                prompt = Prompt(category="custom", subject=args.prompt)
+            else:
+                prompt = get_random_prompt(args.category, rng)
 
-        print(f"[{i + 1}/{args.count}] ({prompt.category}) {prompt.subject!r}", flush=True)
-        image, params = generate_one(
-            model=args.model,
-            pipes=pipes,
-            prompt=prompt,
-            seed=seed,
-            steps=args.steps,
-            refiner_steps=args.refiner_steps,
-            guidance=args.guidance,
-            width=args.width,
-            height=args.height,
-            high_noise_frac=args.high_noise_frac,
+            # Seed policy: explicit --seed is reproducible (seed + i); otherwise draw fresh
+            # per image so an indefinite run keeps producing varied outputs.
+            seed = args.seed + i if args.seed is not None else _draw_seed(rng)
+
+            label = f"#{i + 1}" if args.forever else f"{i + 1}/{args.count}"
+            print(f"[{label}] ({prompt.category}) {prompt.subject!r}", flush=True)
+            image, params = generate_one(
+                model=args.model,
+                pipes=pipes,
+                prompt=prompt,
+                seed=seed,
+                steps=args.steps,
+                refiner_steps=args.refiner_steps,
+                guidance=args.guidance,
+                width=args.width,
+                height=args.height,
+                high_noise_frac=args.high_noise_frac,
+            )
+            img_path = save_outputs(image, params, args.out)
+            made += 1
+            print(f"       → {img_path}  ({params.elapsed_seconds:.1f}s)", flush=True)
+    except KeyboardInterrupt:
+        print(
+            f"\n[interrupted] Stopped after {made} image(s). Outputs in {args.out}/",
+            flush=True,
         )
-        img_path = save_outputs(image, params, args.out)
-        print(f"       → {img_path}  ({params.elapsed_seconds:.1f}s)", flush=True)
+        return 0
 
-    print(f"\nDone. Wrote {args.count} image(s) to {args.out}/", flush=True)
+    print(f"\nDone. Wrote {made} image(s) to {args.out}/", flush=True)
     return 0
 
 
