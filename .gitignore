@@ -1,0 +1,35 @@
+# Generated images & metadata
+output/
+outputs/
+*.png
+*.jpg
+*.jpeg
+*.webp
+# Allow repo-hosted sample images
+!samples/*.png
+!samples/*.jpg
+!docs/*.png
+
+# Model weights should never be committed — they're multi-GB.
+*.safetensors
+*.ckpt
+*.bin
+*.pt
+*.pth
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+env/
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+
+# OS / editors
+.DS_Store
+.idea/
+.vscode/
+*.swp

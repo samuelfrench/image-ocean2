@@ -1,0 +1,18 @@
+# image-ocean2 — local random image generator
+#
+# Tested against the versions installed in the RTX 4090 ComfyUI venv used
+# during development. Any compatible newer point release should work.
+#
+# GPU stack:
+torch>=2.4,<3
+# Diffusion:
+diffusers>=0.30
+transformers>=4.44
+accelerate>=0.34
+safetensors>=0.4
+# Image IO / utilities:
+Pillow>=10
+# Optional, only needed if you use `--model flux`:
+#   huggingface_hub>=0.24   (pulls FLUX.1-schnell from HF cache)
+sentencepiece>=0.2         ; extra == "flux"
+protobuf>=4                ; extra == "flux"
