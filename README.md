@@ -4,6 +4,18 @@ A tiny CLI that generates **super high quality random images locally** on an RTX
 
 No cloud API keys. No subscriptions. Just your GPU and a checkpoint file.
 
+## Quality stack
+
+Every SDXL-based pipeline (`sdxl-refined`, `sdxl-base`, `juggernaut`) runs through:
+
+- **fp16-fix VAE** (`madebyollin/sdxl-vae-fp16-fix`) — kills the washed-out colors and occasional NaN latents the stock SDXL VAE produces under fp16 inference.
+- **DPM++ 2M Karras scheduler** — better convergence per step than the default Euler. Modern SDXL default in Automatic1111 / ComfyUI.
+- **FreeU** with SDXL-tuned values (b1=1.3, b2=1.4, s1=0.9, s2=0.2) — free quality boost from rebalancing U-Net skip connections.
+- **Aesthetic scoring on the refiner** (`aesthetic_score=6.0`) — uses the score conditioning SDXL was actually trained with.
+- **Per-category SDXL bucket resolutions** — landscapes go to 1344×768, portraits to 832×1216, animals to 1152×896, the rest to 1024×1024. Matches the shapes SDXL was bucket-trained on.
+
+CFG defaults to 7.0 (was 7.5) — closer to the SDXL sweet spot.
+
 ## What it makes
 
 Random draws from a curated prompt bank across ten categories — weighted heavily toward fun:
@@ -101,9 +113,9 @@ When `--forever` is on, each image gets a fresh random seed (so an overnight run
 --seed N                Base seed (default random)
 --steps 40              Base pipeline inference steps
 --refiner-steps 15      Refiner steps (sdxl-refined only)
---guidance 7.5          CFG scale
---width 1024            Must be a multiple of 8
---height 1024           Must be a multiple of 8
+--guidance 7.0          CFG scale
+--width N               Must be a multiple of 8 (default: per-category SDXL bucket)
+--height N              Must be a multiple of 8 (default: per-category SDXL bucket)
 --high-noise-frac 0.8   Fraction of steps handled by base before refiner kicks in
 --out DIR               Output directory (default ./output)
 --models-root PATH      Where to look for checkpoints (default ../ComfyUI/models)
@@ -124,14 +136,14 @@ dramatic composition, 8k, crisp, high dynamic range
 
 ## Performance notes
 
-On a 24 GB RTX 4090 at 1024×1024:
+On a 24 GB RTX 4090 with the upgraded quality stack:
 
-- `sdxl-refined` — **~5 s / image** after load (40 base + 15 refiner steps, fp16)
-- `sdxl-base` — ~4 s / image
-- `juggernaut` — ~4 s / image
-- `flux` — ~16 s / image (sequential CPU offload required)
+- `sdxl-refined` — **~4 s / image** at 1024×1024 (DPM++ 2M Karras converges in fewer real steps than Euler did)
+- `sdxl-refined` at 1344×768 — ~4.2 s / image
+- `sdxl-base` / `juggernaut` — ~3–4 s / image
+- `flux` — ~16 s / image (sequential CPU offload required, unchanged)
 
-Model load adds one-off overhead (~3–8 s for SDXL, ~60 s+ for FLUX).
+Model load adds one-off overhead (~3–8 s for SDXL, ~60 s+ for FLUX). The fp16-fix VAE adds a one-time HF download (~335 MB) on first run.
 
 ## License
 

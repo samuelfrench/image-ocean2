@@ -255,6 +255,29 @@ ALL_CATEGORIES: dict[str, list[str]] = {
 }
 
 
+# SDXL was trained on multiple aspect-ratio buckets (Podell et al., 2023). Picking the
+# bucket size that matches the subject reliably produces stronger composition than always
+# rendering at 1024×1024 — wide subjects get wide canvases, etc. All values below are
+# real SDXL bucket sizes.
+CATEGORY_RESOLUTIONS: dict[str, tuple[int, int]] = {
+    "nature": (1344, 768),
+    "architecture": (1344, 768),
+    "vehicles": (1344, 768),
+    "sci_fi": (1344, 768),
+    "portraits": (832, 1216),
+    "animals": (1152, 896),
+    "whimsical": (1024, 1024),
+    "fantasy": (1024, 1024),
+    "food": (1024, 1024),
+    "abstract": (1024, 1024),
+}
+
+
+def get_default_resolution(category: str) -> tuple[int, int]:
+    """Return the SDXL bucket resolution that suits a category. Falls back to square."""
+    return CATEGORY_RESOLUTIONS.get(category, (1024, 1024))
+
+
 # Weights favor fun. Tuned so roughly 55% of random draws are whimsical/fantasy/sci-fi/abstract.
 DEFAULT_WEIGHTS: dict[str, float] = {
     "whimsical": 3.0,

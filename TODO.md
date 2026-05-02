@@ -13,3 +13,4 @@
 - [x] 2026-04-20 — Juggernaut-XL v9 and FLUX.1-schnell pipelines wired behind `--model` flag.
 - [x] 2026-04-20 — Repo pushed to GitHub as public.
 - [x] 2026-04-20 — `--forever` flag with graceful Ctrl-C handling; fresh seed per image when unseeded.
+- [x] 2026-05-02 — Quality upgrade pass: fp16-fix VAE, DPM++ 2M Karras scheduler, FreeU (b1=1.3, b2=1.4, s1=0.9, s2=0.2), refiner aesthetic scoring, per-category SDXL bucket resolutions, default CFG 7.5 → 7.0. ~4 s / image (faster than 5.3 s baseline because DPM++ 2M Karras converges in fewer real steps).

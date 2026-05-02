@@ -40,9 +40,18 @@ from prompts import (  # noqa: E402
     NEGATIVE_PROMPT,
     Prompt,
     decorate,
+    get_default_resolution,
     get_random_prompt,
     list_categories,
 )
+
+
+# Quality knobs applied to every SDXL-style pipeline. See
+# docs/superpowers/specs/2026-05-02-quality-upgrades-design.md for the rationale.
+SDXL_VAE_REPO = "madebyollin/sdxl-vae-fp16-fix"
+FREEU_SDXL = dict(b1=1.3, b2=1.4, s1=0.9, s2=0.2)
+REFINER_AESTHETIC_SCORE = 6.0
+REFINER_NEGATIVE_AESTHETIC_SCORE = 2.5
 
 
 DEFAULT_MODELS_ROOT = Path(__file__).resolve().parent.parent / "ComfyUI" / "models"
@@ -112,15 +121,45 @@ def resolve_checkpoints(models_root: Path, model: str) -> dict[str, Path]:
 _PIPE_CACHE: dict[str, object] = {}
 
 
-def _load_sdxl_single_file(path: Path, dtype: torch.dtype):
+def _load_fp16_fix_vae(dtype: torch.dtype):
+    """Load the SDXL VAE that's numerically stable in fp16.
+
+    The stock SDXL VAE has known precision problems in fp16 (washed-out colors,
+    occasional NaN latents). The community fp16-fix VAE retrains the decoder in
+    fp32 then quantizes — visually identical at full precision, stable at fp16.
+    """
+    from diffusers import AutoencoderKL
+
+    return AutoencoderKL.from_pretrained(SDXL_VAE_REPO, torch_dtype=dtype)
+
+
+def _apply_sdxl_quality_upgrades(pipe) -> None:
+    """Swap to DPM++ 2M Karras and turn on FreeU.
+
+    DPM++ 2M Karras is the modern SDXL default — better detail per step than Euler.
+    FreeU rebalances U-Net skip connections for sharper outputs at no extra cost.
+    """
+    from diffusers import DPMSolverMultistepScheduler
+
+    pipe.scheduler = DPMSolverMultistepScheduler.from_config(
+        pipe.scheduler.config,
+        algorithm_type="dpmsolver++",
+        use_karras_sigmas=True,
+    )
+    pipe.enable_freeu(**FREEU_SDXL)
+
+
+def _load_sdxl_single_file(path: Path, dtype: torch.dtype, vae=None):
     from diffusers import StableDiffusionXLPipeline
 
-    pipe = StableDiffusionXLPipeline.from_single_file(
-        str(path),
+    kwargs: dict = dict(
         torch_dtype=dtype,
         use_safetensors=True,
         add_watermarker=False,
     )
+    if vae is not None:
+        kwargs["vae"] = vae
+    pipe = StableDiffusionXLPipeline.from_single_file(str(path), **kwargs)
     pipe.to("cuda")
     return pipe
 
@@ -147,18 +186,30 @@ def load_pipelines(model: str, ckpts: dict[str, Path], dtype: torch.dtype) -> di
 
     pipes: dict[str, object] = {}
     if model == "sdxl-refined":
+        print("[load] fp16-fix VAE…", flush=True)
+        vae = _load_fp16_fix_vae(dtype)
         print("[load] SDXL base…", flush=True)
-        base = _load_sdxl_single_file(ckpts["base"], dtype)
+        base = _load_sdxl_single_file(ckpts["base"], dtype, vae=vae)
+        _apply_sdxl_quality_upgrades(base)
         print("[load] SDXL refiner…", flush=True)
         refiner = _load_sdxl_refiner(ckpts["refiner"], dtype, base)
+        _apply_sdxl_quality_upgrades(refiner)
         pipes["base"] = base
         pipes["refiner"] = refiner
     elif model == "sdxl-base":
+        print("[load] fp16-fix VAE…", flush=True)
+        vae = _load_fp16_fix_vae(dtype)
         print("[load] SDXL base…", flush=True)
-        pipes["base"] = _load_sdxl_single_file(ckpts["base"], dtype)
+        base = _load_sdxl_single_file(ckpts["base"], dtype, vae=vae)
+        _apply_sdxl_quality_upgrades(base)
+        pipes["base"] = base
     elif model == "juggernaut":
+        print("[load] fp16-fix VAE…", flush=True)
+        vae = _load_fp16_fix_vae(dtype)
         print("[load] Juggernaut-XL v9…", flush=True)
-        pipes["base"] = _load_sdxl_single_file(ckpts["base"], dtype)
+        base = _load_sdxl_single_file(ckpts["base"], dtype, vae=vae)
+        _apply_sdxl_quality_upgrades(base)
+        pipes["base"] = base
     elif model == "flux":
         print("[load] FLUX.1-schnell (HF cache)…", flush=True)
         from diffusers import FluxPipeline
@@ -231,6 +282,8 @@ def generate_one(
             denoising_start=high_noise_frac,
             image=latents,
             generator=gen,
+            aesthetic_score=REFINER_AESTHETIC_SCORE,
+            negative_aesthetic_score=REFINER_NEGATIVE_AESTHETIC_SCORE,
         ).images[0]
     elif model in ("sdxl-base", "juggernaut"):
         pipe = pipes["base"]
@@ -336,9 +389,19 @@ def build_parser() -> argparse.ArgumentParser:
         default=15,
         help="Refiner inference steps (sdxl-refined only).",
     )
-    p.add_argument("--guidance", type=float, default=7.5, help="Classifier-free guidance scale.")
-    p.add_argument("--width", type=int, default=1024, help="Image width.")
-    p.add_argument("--height", type=int, default=1024, help="Image height.")
+    p.add_argument("--guidance", type=float, default=7.0, help="Classifier-free guidance scale.")
+    p.add_argument(
+        "--width",
+        type=int,
+        default=None,
+        help="Image width. Default: SDXL bucket size for the chosen category.",
+    )
+    p.add_argument(
+        "--height",
+        type=int,
+        default=None,
+        help="Image height. Default: SDXL bucket size for the chosen category.",
+    )
     p.add_argument(
         "--high-noise-frac",
         type=float,
@@ -376,9 +439,11 @@ def main(argv: list[str] | None = None) -> int:
     if not torch.cuda.is_available():
         print("WARNING: CUDA not available — this script is tuned for an RTX 4090.")
 
-    # SDXL fine-tunes expect bf16-friendly sizes (multiples of 8).
-    if args.width % 8 or args.height % 8:
-        sys.exit("--width and --height must be multiples of 8.")
+    # SDXL fine-tunes expect bf16-friendly sizes (multiples of 8). Only validate when the
+    # user supplied a value — defaults come from CATEGORY_RESOLUTIONS, which is curated.
+    for label, value in (("--width", args.width), ("--height", args.height)):
+        if value is not None and value % 8:
+            sys.exit(f"{label} must be a multiple of 8.")
 
     ckpts = resolve_checkpoints(args.models_root, args.model)
     dtype = torch.float16  # SDXL default; stable on 40-series GPUs.
@@ -397,9 +462,14 @@ def main(argv: list[str] | None = None) -> int:
 
     count_label = "∞" if args.forever else str(args.count)
     seed_label = "random-per-image" if args.seed is None else str(args.seed)
+    size_label = (
+        f"{args.width}x{args.height}"
+        if args.width and args.height
+        else "per-category SDXL bucket"
+    )
     print(
         f"[run] model={args.model} count={count_label} seed={seed_label} "
-        f"size={args.width}x{args.height} steps={args.steps}",
+        f"size={size_label} steps={args.steps}",
         flush=True,
     )
     if args.forever:
@@ -417,8 +487,18 @@ def main(argv: list[str] | None = None) -> int:
             # per image so an indefinite run keeps producing varied outputs.
             seed = args.seed + i if args.seed is not None else _draw_seed(rng)
 
+            # Per-image resolution: respect user override if both --width and --height were
+            # passed; otherwise pick the SDXL bucket size that matches the prompt's category.
+            if args.width and args.height:
+                width, height = args.width, args.height
+            else:
+                width, height = get_default_resolution(prompt.category)
+
             label = f"#{i + 1}" if args.forever else f"{i + 1}/{args.count}"
-            print(f"[{label}] ({prompt.category}) {prompt.subject!r}", flush=True)
+            print(
+                f"[{label}] ({prompt.category}) {width}x{height} {prompt.subject!r}",
+                flush=True,
+            )
             image, params = generate_one(
                 model=args.model,
                 pipes=pipes,
@@ -427,8 +507,8 @@ def main(argv: list[str] | None = None) -> int:
                 steps=args.steps,
                 refiner_steps=args.refiner_steps,
                 guidance=args.guidance,
-                width=args.width,
-                height=args.height,
+                width=width,
+                height=height,
                 high_noise_frac=args.high_noise_frac,
             )
             img_path = save_outputs(image, params, args.out)
