@@ -82,6 +82,16 @@ PAGE = """<!DOCTYPE html>
     display: inline-block; font-size: 0.7rem; text-transform: uppercase;
     letter-spacing: 0.05em; color: #6cf; font-weight: 600;
   }
+  .model {
+    display: inline-block; font-size: 0.65rem; text-transform: uppercase;
+    letter-spacing: 0.05em; padding: 0.1rem 0.4rem; border-radius: 3px;
+    background: #2a2a2e; color: #d0d0d0; margin-left: 0.4rem;
+    border: 1px solid #333;
+  }
+  .model.sdxl-refined { background: rgba(108,204,255,0.12); color: #6cf; border-color: rgba(108,204,255,0.3); }
+  .model.sdxl-base { background: rgba(255,200,108,0.12); color: #fc6; border-color: rgba(255,200,108,0.3); }
+  .model.juggernaut { background: rgba(255,108,140,0.12); color: #f6a; border-color: rgba(255,108,140,0.3); }
+  .model.flux { background: rgba(160,255,140,0.12); color: #af6; border-color: rgba(160,255,140,0.3); }
   .subj { color: #aaa; margin-top: 0.25rem; display: block; }
   .lightbox {
     position: fixed; inset: 0; background: rgba(0,0,0,0.96);
@@ -111,6 +121,10 @@ PAGE = """<!DOCTYPE html>
   <span class="count" id="count">__N__ images</span>
   <div class="controls">
     <input type="search" id="search" placeholder="filter by prompt…">
+    <select id="modelFilter">
+      <option value="">all models</option>
+      __MODEL_OPTIONS__
+    </select>
     <select id="filter">
       <option value="">all categories</option>
       __OPTIONS__
@@ -135,7 +149,7 @@ const lbMeta = document.getElementById('lb-meta');
 
 function openLightbox(card) {
   lbImg.src = card.dataset.full;
-  lbMeta.textContent = '[' + card.dataset.cat + '] ' + card.dataset.subj;
+  lbMeta.textContent = '[' + card.dataset.cat + ' · ' + card.dataset.model + '] ' + card.dataset.subj;
   lb.classList.add('open');
 }
 function closeLightbox() {
@@ -153,26 +167,30 @@ const cards = Array.from(document.querySelectorAll('.card'));
 cards.forEach(c => c.addEventListener('click', () => openLightbox(c)));
 
 const filter = document.getElementById('filter');
+const modelFilter = document.getElementById('modelFilter');
 const search = document.getElementById('search');
 const countEl = document.getElementById('count');
 const TOTAL = __N__;
 
 function applyFilters() {
   const cat = filter.value;
+  const model = modelFilter.value;
   const q = search.value.trim().toLowerCase();
   let visible = 0;
   cards.forEach(c => {
     const matchCat = !cat || c.dataset.cat === cat;
+    const matchModel = !model || c.dataset.model === model;
     const matchQ = !q || c.dataset.subj.toLowerCase().includes(q);
-    const show = matchCat && matchQ;
+    const show = matchCat && matchModel && matchQ;
     c.style.display = show ? '' : 'none';
     if (show) visible++;
   });
-  countEl.textContent = (cat || q)
+  countEl.textContent = (cat || model || q)
     ? visible + ' / ' + TOTAL + ' images'
     : TOTAL + ' images';
 }
 filter.addEventListener('change', applyFilters);
+modelFilter.addEventListener('change', applyFilters);
 search.addEventListener('input', applyFilters);
 </script>
 </body>
@@ -185,6 +203,7 @@ def render_index() -> str:
         return (
             PAGE.replace("__N__", "0")
             .replace("__OPTIONS__", "")
+            .replace("__MODEL_OPTIONS__", "")
             .replace("__CARDS__", '<div class="empty">No output/ directory yet.</div>')
         )
 
@@ -192,24 +211,33 @@ def render_index() -> str:
 
     cards: list[str] = []
     cats: set[str] = set()
+    models: set[str] = set()
     for p in pngs:
         json_p = p.with_suffix(".json")
         try:
             meta = json.loads(json_p.read_text())
             cat = meta.get("category") or "?"
             subj = meta.get("prompt_subject") or p.stem
+            model = meta.get("model") or "?"
         except Exception:
-            cat, subj = "?", p.stem
+            cat, subj, model = "?", p.stem, "?"
         cats.add(cat)
+        models.add(model)
         url = f"/output/{p.name}"
+        # Class on .model badge controls per-model accent color (CSS).
+        model_class = f"model {html.escape(model, quote=True)}"
         cards.append(
             f'<div class="card" '
             f'data-cat="{html.escape(cat, quote=True)}" '
+            f'data-model="{html.escape(model, quote=True)}" '
             f'data-subj="{html.escape(subj, quote=True)}" '
             f'data-full="{url}">'
             f'<img loading="lazy" src="{url}" alt="{html.escape(subj, quote=True)}">'
-            f'<div class="meta"><span class="cat">{html.escape(cat)}</span>'
-            f'<span class="subj">{html.escape(subj)}</span></div>'
+            f'<div class="meta">'
+            f'<span class="cat">{html.escape(cat)}</span>'
+            f'<span class="{model_class}">{html.escape(model)}</span>'
+            f'<span class="subj">{html.escape(subj)}</span>'
+            f'</div>'
             f"</div>"
         )
 
@@ -217,10 +245,15 @@ def render_index() -> str:
         f'<option value="{html.escape(c, quote=True)}">{html.escape(c)}</option>'
         for c in sorted(cats)
     )
+    model_options = "\n".join(
+        f'<option value="{html.escape(m, quote=True)}">{html.escape(m)}</option>'
+        for m in sorted(models)
+    )
 
     body = (
         PAGE.replace("__N__", str(len(pngs)))
         .replace("__OPTIONS__", options)
+        .replace("__MODEL_OPTIONS__", model_options)
         .replace("__CARDS__", "\n".join(cards) or '<div class="empty">No images yet.</div>')
     )
     return body

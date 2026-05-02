@@ -72,6 +72,15 @@ class GenParams:
     height: int
     high_noise_frac: float  # fraction of steps handled by base when using refiner
     elapsed_seconds: float = 0.0
+    # Pipeline attribution — together with `model` and `seed`, these fields fully describe
+    # how the image was created. Important for licensing and reproducibility audits.
+    model_repo: Optional[str] = None  # checkpoint path or HF repo
+    vae: str = "default"               # "default" or HF repo of overriding VAE
+    scheduler: str = "default"         # human-readable scheduler descriptor
+    freeu: Optional[dict] = None       # {b1,b2,s1,s2} when enabled
+    aesthetic_score: Optional[float] = None
+    negative_aesthetic_score: Optional[float] = None
+    pipeline_version: int = 2          # bumps when the SDXL stack changes meaningfully
     extra: dict = field(default_factory=dict)
 
 
@@ -111,6 +120,41 @@ def resolve_checkpoints(models_root: Path, model: str) -> dict[str, Path]:
     if model == "flux":
         return {}  # FLUX is pulled from the HF cache, not a local .safetensors
     raise ValueError(f"Unknown model: {model}")
+
+
+def describe_model_repo(model: str, ckpts: dict[str, Path]) -> str:
+    """Human-readable identifier of the actual checkpoints/repo for the JSON sidecar."""
+    if model == "sdxl-refined":
+        return f"{ckpts['base'].name} + {ckpts['refiner'].name}"
+    if model in ("sdxl-base", "juggernaut"):
+        return ckpts["base"].name
+    if model == "flux":
+        return "black-forest-labs/FLUX.1-schnell"
+    return "unknown"
+
+
+def attribution_for(model: str) -> dict:
+    """Pipeline metadata to record in the JSON sidecar.
+
+    The returned dict matches `GenParams` field names so it can be splatted in.
+    Lets every saved image self-describe how it was created — important for
+    licensing audits (which model license applies?) and reproducibility.
+    """
+    if model in ("sdxl-refined", "sdxl-base", "juggernaut"):
+        attribution = dict(
+            vae=SDXL_VAE_REPO,
+            scheduler="DPMSolverMultistepScheduler (dpmsolver++, Karras sigmas)",
+            freeu=dict(FREEU_SDXL),
+        )
+        if model == "sdxl-refined":
+            attribution["aesthetic_score"] = REFINER_AESTHETIC_SCORE
+            attribution["negative_aesthetic_score"] = REFINER_NEGATIVE_AESTHETIC_SCORE
+        return attribution
+    if model == "flux":
+        # FLUX-schnell has its own VAE / scheduler stack — none of the SDXL
+        # quality upgrades apply, so the defaults stand.
+        return {}
+    return {}
 
 
 # -------------------------------------------------------------------
@@ -253,6 +297,7 @@ def generate_one(
     width: int,
     height: int,
     high_noise_frac: float,
+    model_repo: str = "unknown",
 ) -> tuple:
     gen = torch.Generator(device="cuda").manual_seed(seed)
     full_prompt = decorate(prompt.subject)
@@ -327,6 +372,8 @@ def generate_one(
         height=height,
         high_noise_frac=high_noise_frac,
         elapsed_seconds=round(elapsed, 2),
+        model_repo=model_repo,
+        **attribution_for(model),
     )
     return image, params
 
@@ -335,7 +382,9 @@ def save_outputs(image, params: GenParams, out_dir: Path) -> Path:
     out_dir.mkdir(parents=True, exist_ok=True)
     ts = time.strftime("%Y%m%d-%H%M%S")
     slug = slugify(params.prompt_subject)
-    base_name = f"{ts}_{params.category or 'custom'}_{slug}_s{params.seed}"
+    # Filename embeds the model so attribution is visible from `ls` without opening
+    # the JSON sidecar. Order: timestamp, model, category, slug, seed.
+    base_name = f"{ts}_{params.model}_{params.category or 'custom'}_{slug}_s{params.seed}"
     img_path = out_dir / f"{base_name}.png"
     meta_path = out_dir / f"{base_name}.json"
     image.save(img_path, "PNG", optimize=True)
@@ -448,6 +497,7 @@ def main(argv: list[str] | None = None) -> int:
     ckpts = resolve_checkpoints(args.models_root, args.model)
     dtype = torch.float16  # SDXL default; stable on 40-series GPUs.
     pipes = load_pipelines(args.model, ckpts, dtype)
+    model_repo = describe_model_repo(args.model, ckpts)
 
     rng = random.Random(args.seed)
 
@@ -510,6 +560,7 @@ def main(argv: list[str] | None = None) -> int:
                 width=width,
                 height=height,
                 high_noise_frac=args.high_noise_frac,
+                model_repo=model_repo,
             )
             img_path = save_outputs(image, params, args.out)
             made += 1

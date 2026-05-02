@@ -98,7 +98,18 @@ python generate.py --seed 42 --count 4
 python generate.py --forever
 ```
 
-Everything lands in `output/` as `TIMESTAMP_category_slug_sSEED.png` plus a JSON sidecar containing the exact prompt, seed, model, and steps for reproducibility.
+Everything lands in `output/` as `TIMESTAMP_MODEL_CATEGORY_SLUG_sSEED.png` plus a matching `.json` sidecar that fully records how the image was made — model, model_repo (checkpoint), VAE, scheduler, FreeU values, aesthetic scores, prompt, seed, steps, dimensions. That makes per-image attribution trivial to audit (e.g. for licensing) and keeps every image reproducible.
+
+### Backfill for older outputs
+
+Pre-existing images saved before this attribution scheme was added can be brought up to the new standard with:
+
+```sh
+python backfill_attribution.py --dry-run    # preview
+python backfill_attribution.py              # rename + extend JSON
+```
+
+The script is idempotent and uses the timestamp embedded in each filename to figure out which pipeline era the file came from (pre or post the 2026‑05‑02 SDXL quality stack).
 
 ### Local gallery
 
