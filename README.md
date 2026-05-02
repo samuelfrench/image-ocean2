@@ -100,6 +100,17 @@ python generate.py --forever
 
 Everything lands in `output/` as `TIMESTAMP_category_slug_sSEED.png` plus a JSON sidecar containing the exact prompt, seed, model, and steps for reproducibility.
 
+### Local gallery
+
+```sh
+python gallery.py
+# image-ocean2 gallery: http://127.0.0.1:8765/
+```
+
+Stdlib-only web server (no extra deps). Renders a responsive thumbnail grid with category filter, prompt search, and a click-to-zoom lightbox. The index is rebuilt from disk on every request, so anything written by an in-flight `--forever` run shows up the moment you refresh.
+
+Flags: `--port 9000`, `--host 0.0.0.0` (LAN, careful — there's no auth).
+
 When `--forever` is on, each image gets a fresh random seed (so an overnight run keeps varying) unless you pass `--seed N`, in which case seeds are `N, N+1, N+2, …` — fully reproducible. On Ctrl-C the script prints `[interrupted] Stopped after N image(s)` and exits cleanly.
 
 ### All flags
