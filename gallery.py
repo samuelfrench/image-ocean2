@@ -5,7 +5,18 @@ A tiny stdlib-only web server that renders ``output/`` as a responsive
 thumbnail grid. Reads each PNG's JSON sidecar so cards show the category
 and full prompt subject. The index is rebuilt from disk on every request,
 so images created by an in-flight ``--forever`` run show up the moment
-you reload.
+you reload — and the live feed prepends them without a reload.
+
+Auto-scrolling features
+-----------------------
+* **Ambient page scroll** — header button (or spacebar) toggles a slow
+  continuous downward scroll that wraps to the top at the bottom edge.
+* **Live feed** — polls ``/api/list`` every 5 s and prepends new images
+  with a brief highlight pulse. Shows a "+N new" pill when scrolled
+  away from the top.
+* **Lightbox slideshow** — play/pause button (or spacebar) inside the
+  lightbox advances every 4 s through the currently visible cards;
+  arrow keys for prev/next.
 
 Usage:
   python gallery.py                     # http://127.0.0.1:8765
@@ -23,6 +34,7 @@ import os
 import socketserver
 import sys
 from pathlib import Path
+from urllib.parse import parse_qs, urlsplit
 
 ROOT = Path(__file__).resolve().parent
 OUTPUT_DIR = ROOT / "output"
@@ -42,14 +54,14 @@ PAGE = """<!DOCTYPE html>
     background: #0d0d0f; color: #e6e6e6; margin: 0;
   }
   header {
-    position: sticky; top: 0; z-index: 10;
+    position: sticky; top: 0; z-index: 20;
     background: rgba(13,13,15,0.92); backdrop-filter: blur(8px);
     padding: 0.75rem 1.25rem; border-bottom: 1px solid #222;
     display: flex; align-items: baseline; gap: 1rem; flex-wrap: wrap;
   }
   h1 { font-size: 1.1rem; margin: 0; font-weight: 600; }
   .count { color: #888; font-size: 0.9rem; }
-  .controls { margin-left: auto; display: flex; gap: 0.5rem; align-items: center; }
+  .controls { margin-left: auto; display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; }
   select, button, input[type=search] {
     background: #1a1a1d; color: #eee; border: 1px solid #333;
     padding: 0.4rem 0.7rem; border-radius: 6px; font-size: 0.85rem;
@@ -57,7 +69,22 @@ PAGE = """<!DOCTYPE html>
   }
   button { cursor: pointer; }
   button:hover, select:hover, input:hover { border-color: #555; }
+  button.active { background: #15323f; border-color: #6cf; color: #6cf; }
   input[type=search] { width: 200px; }
+  .live-dot {
+    display: inline-block; width: 8px; height: 8px; border-radius: 50%;
+    background: #555; margin-right: 0.4rem; vertical-align: middle;
+    transition: background 0.2s, box-shadow 0.2s;
+  }
+  .live-dot.on {
+    background: #4cd964;
+    box-shadow: 0 0 6px rgba(76, 217, 100, 0.7);
+    animation: live-pulse 2s ease-in-out infinite;
+  }
+  @keyframes live-pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.45; }
+  }
   main { padding: 1.25rem; }
   .grid {
     display: grid;
@@ -74,6 +101,11 @@ PAGE = """<!DOCTYPE html>
     box-shadow: 0 6px 20px rgba(0,0,0,0.5);
   }
   .card img { width: 100%; height: auto; display: block; background: #222; }
+  .card.new { animation: pulse-new 1.6s ease-out; }
+  @keyframes pulse-new {
+    0%   { box-shadow: 0 0 0 0   rgba(108, 207, 255, 0.75); }
+    100% { box-shadow: 0 0 0 14px rgba(108, 207, 255, 0);    }
+  }
   .meta {
     padding: 0.6rem 0.75rem; font-size: 0.82rem; line-height: 1.4;
     border-top: 1px solid #222;
@@ -82,17 +114,19 @@ PAGE = """<!DOCTYPE html>
     display: inline-block; font-size: 0.7rem; text-transform: uppercase;
     letter-spacing: 0.05em; color: #6cf; font-weight: 600;
   }
-  .model {
-    display: inline-block; font-size: 0.65rem; text-transform: uppercase;
-    letter-spacing: 0.05em; padding: 0.1rem 0.4rem; border-radius: 3px;
-    background: #2a2a2e; color: #d0d0d0; margin-left: 0.4rem;
-    border: 1px solid #333;
-  }
-  .model.sdxl-refined { background: rgba(108,204,255,0.12); color: #6cf; border-color: rgba(108,204,255,0.3); }
-  .model.sdxl-base { background: rgba(255,200,108,0.12); color: #fc6; border-color: rgba(255,200,108,0.3); }
-  .model.juggernaut { background: rgba(255,108,140,0.12); color: #f6a; border-color: rgba(255,108,140,0.3); }
-  .model.flux { background: rgba(160,255,140,0.12); color: #af6; border-color: rgba(160,255,140,0.3); }
   .subj { color: #aaa; margin-top: 0.25rem; display: block; }
+  .new-pill {
+    position: fixed; top: 4.2rem; left: 50%; transform: translateX(-50%);
+    background: #6cf; color: #0d0d0f; padding: 0.45rem 1rem;
+    border-radius: 999px; font-size: 0.85rem; font-weight: 600;
+    cursor: pointer; opacity: 0; pointer-events: none;
+    transition: opacity 0.25s, transform 0.25s; z-index: 50;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+  }
+  .new-pill.show {
+    opacity: 1; pointer-events: auto;
+    transform: translateX(-50%) translateY(0);
+  }
   .lightbox {
     position: fixed; inset: 0; background: rgba(0,0,0,0.96);
     display: none; align-items: center; justify-content: center;
@@ -110,8 +144,27 @@ PAGE = """<!DOCTYPE html>
   }
   .lb-close {
     position: fixed; top: 0.75rem; right: 1.25rem; color: #ccc;
-    font-size: 2rem; cursor: pointer; user-select: none;
+    font-size: 2rem; cursor: pointer; user-select: none; z-index: 110;
   }
+  .lb-controls {
+    position: fixed; bottom: 1rem; right: 1.25rem; z-index: 110;
+    display: flex; gap: 0.5rem;
+  }
+  .lb-controls button {
+    background: rgba(0,0,0,0.7); color: #eee; border: 1px solid #444;
+    width: 42px; height: 42px; border-radius: 50%; font-size: 1rem;
+    padding: 0; line-height: 1;
+  }
+  .lb-controls button:hover { border-color: #6cf; color: #6cf; }
+  .lb-nav {
+    position: fixed; top: 50%; transform: translateY(-50%);
+    color: #ccc; font-size: 2.4rem; cursor: pointer;
+    user-select: none; padding: 1rem 1.25rem; z-index: 110;
+    opacity: 0.5; transition: opacity 0.15s;
+  }
+  .lb-nav:hover { opacity: 1; color: #6cf; }
+  .lb-prev { left: 0.5rem; }
+  .lb-next { right: 0.5rem; }
   .empty { color: #666; padding: 3rem; text-align: center; }
 </style>
 </head>
@@ -121,123 +174,369 @@ PAGE = """<!DOCTYPE html>
   <span class="count" id="count">__N__ images</span>
   <div class="controls">
     <input type="search" id="search" placeholder="filter by prompt…">
-    <select id="modelFilter">
-      <option value="">all models</option>
-      __MODEL_OPTIONS__
-    </select>
     <select id="filter">
       <option value="">all categories</option>
       __OPTIONS__
     </select>
-    <button onclick="location.reload()">refresh</button>
+    <button id="ambient-btn" title="Toggle ambient auto-scroll (space)">▶ scroll</button>
+    <button id="live-btn" class="active" title="Toggle live feed polling"><span class="live-dot on" id="live-dot"></span>live</button>
+    <button onclick="location.reload()" title="Reload from disk">refresh</button>
   </div>
 </header>
+<div class="new-pill" id="new-pill" title="Click to jump to top">+0 new</div>
 <main>
   <div class="grid" id="grid">
     __CARDS__
   </div>
 </main>
 <div class="lightbox" id="lightbox">
-  <span class="lb-close" onclick="closeLightbox()">×</span>
+  <span class="lb-close" onclick="closeLightbox()" title="Close (Esc)">×</span>
+  <span class="lb-nav lb-prev" id="lb-prev" title="Previous (←)">‹</span>
+  <span class="lb-nav lb-next" id="lb-next" title="Next (→)">›</span>
   <img id="lb-img" src="" alt="">
   <div class="lb-meta" id="lb-meta"></div>
+  <div class="lb-controls">
+    <button id="ss-btn" title="Toggle slideshow (space)">▶</button>
+  </div>
 </div>
 <script>
+"use strict";
+
+const grid = document.getElementById('grid');
 const lb = document.getElementById('lightbox');
 const lbImg = document.getElementById('lb-img');
 const lbMeta = document.getElementById('lb-meta');
-
-function openLightbox(card) {
-  lbImg.src = card.dataset.full;
-  lbMeta.textContent = '[' + card.dataset.cat + ' · ' + card.dataset.model + '] ' + card.dataset.subj;
-  lb.classList.add('open');
-}
-function closeLightbox() {
-  lb.classList.remove('open');
-  lbImg.src = '';
-}
-lb.addEventListener('click', e => {
-  if (e.target === lb || e.target === lbImg) closeLightbox();
-});
-document.addEventListener('keydown', e => {
-  if (e.key === 'Escape') closeLightbox();
-});
-
-const cards = Array.from(document.querySelectorAll('.card'));
-cards.forEach(c => c.addEventListener('click', () => openLightbox(c)));
-
 const filter = document.getElementById('filter');
-const modelFilter = document.getElementById('modelFilter');
 const search = document.getElementById('search');
 const countEl = document.getElementById('count');
-const TOTAL = __N__;
+const ambientBtn = document.getElementById('ambient-btn');
+const liveBtn = document.getElementById('live-btn');
+const liveDot = document.getElementById('live-dot');
+const newPill = document.getElementById('new-pill');
+const ssBtn = document.getElementById('ss-btn');
+const lbPrev = document.getElementById('lb-prev');
+const lbNext = document.getElementById('lb-next');
 
+// ---------- Filtering ----------
 function applyFilters() {
   const cat = filter.value;
-  const model = modelFilter.value;
   const q = search.value.trim().toLowerCase();
+  const all = document.querySelectorAll('.card');
   let visible = 0;
-  cards.forEach(c => {
+  all.forEach(c => {
     const matchCat = !cat || c.dataset.cat === cat;
-    const matchModel = !model || c.dataset.model === model;
     const matchQ = !q || c.dataset.subj.toLowerCase().includes(q);
-    const show = matchCat && matchModel && matchQ;
+    const show = matchCat && matchQ;
     c.style.display = show ? '' : 'none';
     if (show) visible++;
   });
-  countEl.textContent = (cat || model || q)
-    ? visible + ' / ' + TOTAL + ' images'
-    : TOTAL + ' images';
+  countEl.textContent = (cat || q)
+    ? visible + ' / ' + all.length + ' images'
+    : all.length + ' images';
 }
 filter.addEventListener('change', applyFilters);
-modelFilter.addEventListener('change', applyFilters);
 search.addEventListener('input', applyFilters);
+
+// ---------- Lightbox ----------
+let currentLbCard = null;
+
+function visibleCards() {
+  return Array.from(document.querySelectorAll('.card'))
+    .filter(c => c.style.display !== 'none');
+}
+
+function openLightbox(card) {
+  currentLbCard = card;
+  lbImg.src = card.dataset.full;
+  lbMeta.textContent = '[' + card.dataset.cat + '] ' + card.dataset.subj;
+  lb.classList.add('open');
+  if (slideshowOn) restartSlideshowTimer();
+}
+
+function closeLightbox() {
+  lb.classList.remove('open');
+  lbImg.src = '';
+  currentLbCard = null;
+  stopSlideshowTimer();
+}
+
+function stepLightbox(dir) {
+  const cards = visibleCards();
+  if (cards.length === 0) return;
+  let idx = cards.indexOf(currentLbCard);
+  if (idx < 0) idx = 0;
+  const next = cards[(idx + dir + cards.length) % cards.length];
+  openLightbox(next);
+}
+
+lb.addEventListener('click', e => {
+  if (e.target === lb || e.target === lbImg) closeLightbox();
+});
+lbPrev.addEventListener('click', e => { e.stopPropagation(); stepLightbox(-1); if (slideshowOn) restartSlideshowTimer(); });
+lbNext.addEventListener('click', e => { e.stopPropagation(); stepLightbox(1);  if (slideshowOn) restartSlideshowTimer(); });
+
+function attachCardHandlers(card) {
+  card.addEventListener('click', () => openLightbox(card));
+}
+document.querySelectorAll('.card').forEach(attachCardHandlers);
+
+// ---------- Ambient auto-scroll ----------
+const AMBIENT_PX_PER_SEC = 30;
+let ambientOn = false;
+let ambientLast = 0;
+
+function ambientStep(ts) {
+  if (!ambientOn) return;
+  if (lb.classList.contains('open')) {
+    ambientLast = ts;  // hold steady while paused
+    requestAnimationFrame(ambientStep);
+    return;
+  }
+  if (ambientLast) {
+    const dt = (ts - ambientLast) / 1000;
+    const dy = AMBIENT_PX_PER_SEC * dt;
+    const max = document.documentElement.scrollHeight - window.innerHeight;
+    if (max <= 0) {
+      // nothing to scroll yet
+    } else if (window.scrollY + dy >= max) {
+      window.scrollTo(0, 0);
+    } else {
+      window.scrollBy(0, dy);
+    }
+  }
+  ambientLast = ts;
+  requestAnimationFrame(ambientStep);
+}
+
+function setAmbient(on) {
+  ambientOn = on;
+  ambientLast = 0;
+  ambientBtn.classList.toggle('active', on);
+  ambientBtn.textContent = on ? '⏸ scroll' : '▶ scroll';
+  if (on) requestAnimationFrame(ambientStep);
+}
+ambientBtn.addEventListener('click', () => setAmbient(!ambientOn));
+
+// ---------- Live feed ----------
+const POLL_MS = 5000;
+const NEAR_TOP_PX = 200;
+let liveOn = true;
+let latestMtime = 0;
+let pendingNew = 0;
+
+(function initLatest() {
+  const first = document.querySelector('.card');
+  if (!first) return;
+  const m = parseFloat(first.dataset.mtime);
+  if (!isNaN(m)) latestMtime = m;
+})();
+
+function makeCard(item) {
+  const div = document.createElement('div');
+  div.className = 'card new';
+  div.dataset.cat = item.cat;
+  div.dataset.subj = item.subj;
+  div.dataset.mtime = String(item.mtime);
+  div.dataset.full = item.url;
+
+  const img = document.createElement('img');
+  img.loading = 'lazy';
+  img.src = item.url;
+  img.alt = item.subj;
+
+  const meta = document.createElement('div');
+  meta.className = 'meta';
+  const cat = document.createElement('span');
+  cat.className = 'cat';
+  cat.textContent = item.cat;
+  const subj = document.createElement('span');
+  subj.className = 'subj';
+  subj.textContent = item.subj;
+  meta.appendChild(cat);
+  meta.appendChild(subj);
+
+  div.appendChild(img);
+  div.appendChild(meta);
+  div.addEventListener('animationend', () => div.classList.remove('new'));
+  attachCardHandlers(div);
+  return div;
+}
+
+function showNewPill() {
+  newPill.textContent = '+' + pendingNew + ' new ↑';
+  newPill.classList.add('show');
+}
+function hideNewPill() {
+  pendingNew = 0;
+  newPill.classList.remove('show');
+}
+newPill.addEventListener('click', () => {
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+  hideNewPill();
+});
+window.addEventListener('scroll', () => {
+  if (window.scrollY <= NEAR_TOP_PX && pendingNew > 0) hideNewPill();
+});
+
+async function pollOnce() {
+  try {
+    const r = await fetch('/api/list?since=' + encodeURIComponent(latestMtime));
+    if (!r.ok) return;
+    const data = await r.json();
+    const items = data.images || [];
+    if (items.length === 0) return;
+
+    const empty = grid.querySelector('.empty');
+    if (empty) empty.remove();
+
+    const anchor = grid.querySelector('.card');
+    for (const it of items) {
+      const card = makeCard(it);
+      if (anchor) grid.insertBefore(card, anchor);
+      else grid.appendChild(card);
+      if (it.mtime > latestMtime) latestMtime = it.mtime;
+    }
+    applyFilters();
+
+    if (window.scrollY <= NEAR_TOP_PX) {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    } else {
+      pendingNew += items.length;
+      showNewPill();
+    }
+  } catch (e) {
+    // network blip — try again next interval
+  }
+}
+
+async function pollLoop() {
+  if (liveOn) await pollOnce();
+  setTimeout(pollLoop, POLL_MS);
+}
+pollLoop();
+
+function setLive(on) {
+  liveOn = on;
+  liveDot.classList.toggle('on', on);
+  liveBtn.classList.toggle('active', on);
+}
+liveBtn.addEventListener('click', () => setLive(!liveOn));
+
+// ---------- Lightbox slideshow ----------
+const SLIDESHOW_MS = 4000;
+let slideshowOn = false;
+let slideshowTimer = null;
+
+function startSlideshow() {
+  slideshowOn = true;
+  ssBtn.textContent = '❚❚';
+  ssBtn.classList.add('active');
+  restartSlideshowTimer();
+}
+function stopSlideshow() {
+  slideshowOn = false;
+  ssBtn.textContent = '▶';
+  ssBtn.classList.remove('active');
+  stopSlideshowTimer();
+}
+function restartSlideshowTimer() {
+  stopSlideshowTimer();
+  slideshowTimer = setInterval(() => stepLightbox(1), SLIDESHOW_MS);
+}
+function stopSlideshowTimer() {
+  if (slideshowTimer) {
+    clearInterval(slideshowTimer);
+    slideshowTimer = null;
+  }
+}
+ssBtn.addEventListener('click', e => {
+  e.stopPropagation();
+  slideshowOn ? stopSlideshow() : startSlideshow();
+});
+lbImg.addEventListener('mouseenter', () => { if (slideshowOn) stopSlideshowTimer(); });
+lbImg.addEventListener('mouseleave', () => { if (slideshowOn) restartSlideshowTimer(); });
+
+// ---------- Keyboard ----------
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') {
+    if (lb.classList.contains('open')) closeLightbox();
+    return;
+  }
+  const tag = (document.activeElement && document.activeElement.tagName) || '';
+  if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+
+  if (lb.classList.contains('open')) {
+    if (e.key === 'ArrowRight') {
+      e.preventDefault();
+      stepLightbox(1);
+      if (slideshowOn) restartSlideshowTimer();
+    } else if (e.key === 'ArrowLeft') {
+      e.preventDefault();
+      stepLightbox(-1);
+      if (slideshowOn) restartSlideshowTimer();
+    } else if (e.key === ' ') {
+      e.preventDefault();
+      slideshowOn ? stopSlideshow() : startSlideshow();
+    }
+  } else {
+    if (e.key === ' ' && tag !== 'BUTTON' && tag !== 'SELECT') {
+      e.preventDefault();
+      setAmbient(!ambientOn);
+    }
+  }
+});
 </script>
 </body>
 </html>
 """
 
 
-def render_index() -> str:
+def list_images() -> list[dict]:
+    """Walk OUTPUT_DIR and return image records sorted newest-first."""
     if not OUTPUT_DIR.exists():
-        return (
-            PAGE.replace("__N__", "0")
-            .replace("__OPTIONS__", "")
-            .replace("__MODEL_OPTIONS__", "")
-            .replace("__CARDS__", '<div class="empty">No output/ directory yet.</div>')
-        )
-
+        return []
     pngs = sorted(OUTPUT_DIR.glob("*.png"), key=lambda p: p.stat().st_mtime, reverse=True)
-
-    cards: list[str] = []
-    cats: set[str] = set()
-    models: set[str] = set()
+    items: list[dict] = []
     for p in pngs:
         json_p = p.with_suffix(".json")
         try:
             meta = json.loads(json_p.read_text())
             cat = meta.get("category") or "?"
             subj = meta.get("prompt_subject") or p.stem
-            model = meta.get("model") or "?"
         except Exception:
-            cat, subj, model = "?", p.stem, "?"
-        cats.add(cat)
-        models.add(model)
-        url = f"/output/{p.name}"
-        # Class on .model badge controls per-model accent color (CSS).
-        model_class = f"model {html.escape(model, quote=True)}"
+            cat, subj = "?", p.stem
+        items.append({
+            "name": p.name,
+            "url": f"/output/{p.name}",
+            "cat": cat,
+            "subj": subj,
+            "mtime": p.stat().st_mtime,
+        })
+    return items
+
+
+def render_index() -> str:
+    items = list_images()
+    if not items and not OUTPUT_DIR.exists():
+        return (
+            PAGE.replace("__N__", "0")
+            .replace("__OPTIONS__", "")
+            .replace("__CARDS__", '<div class="empty">No output/ directory yet.</div>')
+        )
+
+    cats: set[str] = set()
+    cards: list[str] = []
+    for it in items:
+        cats.add(it["cat"])
         cards.append(
             f'<div class="card" '
-            f'data-cat="{html.escape(cat, quote=True)}" '
-            f'data-model="{html.escape(model, quote=True)}" '
-            f'data-subj="{html.escape(subj, quote=True)}" '
-            f'data-full="{url}">'
-            f'<img loading="lazy" src="{url}" alt="{html.escape(subj, quote=True)}">'
-            f'<div class="meta">'
-            f'<span class="cat">{html.escape(cat)}</span>'
-            f'<span class="{model_class}">{html.escape(model)}</span>'
-            f'<span class="subj">{html.escape(subj)}</span>'
-            f'</div>'
+            f'data-cat="{html.escape(it["cat"], quote=True)}" '
+            f'data-subj="{html.escape(it["subj"], quote=True)}" '
+            f'data-mtime="{it["mtime"]:.6f}" '
+            f'data-full="{it["url"]}">'
+            f'<img loading="lazy" src="{it["url"]}" alt="{html.escape(it["subj"], quote=True)}">'
+            f'<div class="meta"><span class="cat">{html.escape(it["cat"])}</span>'
+            f'<span class="subj">{html.escape(it["subj"])}</span></div>'
             f"</div>"
         )
 
@@ -245,33 +544,42 @@ def render_index() -> str:
         f'<option value="{html.escape(c, quote=True)}">{html.escape(c)}</option>'
         for c in sorted(cats)
     )
-    model_options = "\n".join(
-        f'<option value="{html.escape(m, quote=True)}">{html.escape(m)}</option>'
-        for m in sorted(models)
-    )
-
-    body = (
-        PAGE.replace("__N__", str(len(pngs)))
+    return (
+        PAGE.replace("__N__", str(len(items)))
         .replace("__OPTIONS__", options)
-        .replace("__MODEL_OPTIONS__", model_options)
         .replace("__CARDS__", "\n".join(cards) or '<div class="empty">No images yet.</div>')
     )
-    return body
 
 
 class Handler(http.server.SimpleHTTPRequestHandler):
     def do_GET(self) -> None:  # noqa: N802 (stdlib name)
         if self.path in ("/", "/index.html"):
             body = render_index().encode("utf-8")
-            self.send_response(200)
-            self.send_header("Content-Type", "text/html; charset=utf-8")
-            self.send_header("Content-Length", str(len(body)))
-            self.send_header("Cache-Control", "no-store")
-            self.end_headers()
-            self.wfile.write(body)
+            self._send_bytes(body, "text/html; charset=utf-8")
             return
-        # Static fallthrough: serves /output/*.png and /output/*.json relative to ROOT.
+        if self.path.startswith("/api/list"):
+            self._serve_list_json()
+            return
         super().do_GET()
+
+    def _send_bytes(self, body: bytes, content_type: str, status: int = 200) -> None:
+        self.send_response(status)
+        self.send_header("Content-Type", content_type)
+        self.send_header("Content-Length", str(len(body)))
+        self.send_header("Cache-Control", "no-store")
+        self.end_headers()
+        self.wfile.write(body)
+
+    def _serve_list_json(self) -> None:
+        qs = parse_qs(urlsplit(self.path).query)
+        try:
+            since = float(qs.get("since", ["0"])[0])
+        except (TypeError, ValueError):
+            since = 0.0
+        all_items = list_images()
+        new_items = [it for it in all_items if it["mtime"] > since]
+        body = json.dumps({"images": new_items, "total": len(all_items)}).encode("utf-8")
+        self._send_bytes(body, "application/json; charset=utf-8")
 
     def log_message(self, fmt: str, *args) -> None:  # noqa: N802
         # Skip 200s on /output/* — they're noisy when scrolling. Keep everything else.

@@ -118,7 +118,13 @@ python gallery.py
 # image-ocean2 gallery: http://127.0.0.1:8765/
 ```
 
-Stdlib-only web server (no extra deps). Renders a responsive thumbnail grid with category filter, prompt search, and a click-to-zoom lightbox. The index is rebuilt from disk on every request, so anything written by an in-flight `--forever` run shows up the moment you refresh.
+Stdlib-only web server (no extra deps). Responsive thumbnail grid, category filter, prompt search, click-to-zoom lightbox.
+
+**Auto-scrolling features:**
+
+- **Ambient page scroll** — header `▶ scroll` button (or `space`) toggles a slow continuous downward scroll that wraps back to the top. Pauses while the lightbox is open.
+- **Live feed** — polls `/api/list` every 5 s and prepends new images with a brief highlight pulse, so an in-flight `--forever` run streams in without a reload. If you're scrolled down, a `+N new ↑` pill appears so you don't lose your place. Toggle with the `live` button.
+- **Lightbox slideshow** — `▶` button (or `space`) inside the lightbox advances every 4 s through the currently visible cards. `←` / `→` for manual prev/next; hover the image to pause.
 
 Flags: `--port 9000`, `--host 0.0.0.0` (LAN, careful — there's no auth).
 
