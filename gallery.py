@@ -389,6 +389,9 @@ async function pollOnce() {
     const empty = grid.querySelector('.empty');
     if (empty) empty.remove();
 
+    const prevScrollY = window.scrollY;
+    const prevScrollHeight = document.documentElement.scrollHeight;
+
     const anchor = grid.querySelector('.card');
     for (const it of items) {
       const card = makeCard(it);
@@ -398,9 +401,11 @@ async function pollOnce() {
     }
     applyFilters();
 
-    if (window.scrollY <= NEAR_TOP_PX) {
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-    } else {
+    // Preserve visual position when content is prepended above the viewport.
+    // Skip when at true top (scrollY === 0) so the user naturally sees new arrivals.
+    if (prevScrollY > 0) {
+      const heightAdded = document.documentElement.scrollHeight - prevScrollHeight;
+      if (heightAdded > 0) window.scrollTo(0, prevScrollY + heightAdded);
       pendingNew += items.length;
       showNewPill();
     }
