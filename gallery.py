@@ -38,6 +38,8 @@ from urllib.parse import parse_qs, urlsplit
 
 ROOT = Path(__file__).resolve().parent
 OUTPUT_DIR = ROOT / "output"
+INITIAL_PAGE_SIZE = 200  # how many cards the server renders into the initial HTML
+PAGE_SIZE = 200  # /api/page batch size for infinite-scroll loads
 
 
 PAGE = """<!DOCTYPE html>
@@ -45,7 +47,7 @@ PAGE = """<!DOCTYPE html>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>image-ocean2 gallery — __N__ images</title>
+<title>image-ocean2 gallery — __TOTAL__ images</title>
 <style>
   :root { color-scheme: dark; }
   * { box-sizing: border-box; }
@@ -95,12 +97,20 @@ PAGE = """<!DOCTYPE html>
     background: #18181b; border-radius: 8px; overflow: hidden;
     cursor: zoom-in; transition: transform 0.1s, box-shadow 0.1s;
     display: flex; flex-direction: column;
+    /* Browser-native virtualization: skip layout/paint for off-screen
+       cards. contain-intrinsic-size reserves space so the scrollbar
+       and scrollHeight stay stable while skipped content exists. */
+    content-visibility: auto;
+    contain-intrinsic-size: 320px 360px;
   }
   .card:hover {
     transform: translateY(-2px);
     box-shadow: 0 6px 20px rgba(0,0,0,0.5);
   }
-  .card img { width: 100%; height: auto; display: block; background: #222; }
+  /* Aspect-ratio fallback when an image lacks width/height attrs.
+     Modern browsers derive aspect ratio from width/height attrs, so
+     this only kicks in for sidecars missing dimensions. */
+  .card img { width: 100%; height: auto; display: block; background: #222; aspect-ratio: 1 / 1; }
   .card.new { animation: pulse-new 1.6s ease-out; }
   @keyframes pulse-new {
     0%   { box-shadow: 0 0 0 0   rgba(108, 207, 255, 0.75); }
@@ -166,12 +176,14 @@ PAGE = """<!DOCTYPE html>
   .lb-prev { left: 0.5rem; }
   .lb-next { right: 0.5rem; }
   .empty { color: #666; padding: 3rem; text-align: center; }
+  .sentinel { color: #555; padding: 2rem 1rem 4rem; text-align: center; font-size: 0.85rem; }
+  .sentinel.done { color: #444; }
 </style>
 </head>
 <body>
 <header>
   <h1>image-ocean2</h1>
-  <span class="count" id="count">__N__ images</span>
+  <span class="count" id="count" data-total="__TOTAL__">__N__ of __TOTAL__ images</span>
   <div class="controls">
     <input type="search" id="search" placeholder="filter by prompt…">
     <select id="filter">
@@ -188,6 +200,7 @@ PAGE = """<!DOCTYPE html>
   <div class="grid" id="grid">
     __CARDS__
   </div>
+  <div class="sentinel" id="sentinel">Loading more…</div>
 </main>
 <div class="lightbox" id="lightbox">
   <span class="lb-close" onclick="closeLightbox()" title="Close (Esc)">×</span>
@@ -209,6 +222,7 @@ const lbMeta = document.getElementById('lb-meta');
 const filter = document.getElementById('filter');
 const search = document.getElementById('search');
 const countEl = document.getElementById('count');
+const sentinel = document.getElementById('sentinel');
 const ambientBtn = document.getElementById('ambient-btn');
 const liveBtn = document.getElementById('live-btn');
 const liveDot = document.getElementById('live-dot');
@@ -217,22 +231,35 @@ const ssBtn = document.getElementById('ss-btn');
 const lbPrev = document.getElementById('lb-prev');
 const lbNext = document.getElementById('lb-next');
 
+let totalOnDisk = parseInt(countEl.dataset.total || '0', 10) || 0;
+
+function updateCount() {
+  const all = document.querySelectorAll('.card');
+  const n = all.length;
+  const cat = filter.value;
+  const q = search.value.trim().toLowerCase();
+  if (cat || q) {
+    let visible = 0;
+    all.forEach(c => { if (c.style.display !== 'none') visible++; });
+    countEl.textContent = visible + ' / ' + n + ' loaded' + (n < totalOnDisk ? ' (' + totalOnDisk + ' total)' : '');
+  } else {
+    countEl.textContent = n < totalOnDisk
+      ? n + ' of ' + totalOnDisk + ' images'
+      : n + ' images';
+  }
+}
+
 // ---------- Filtering ----------
 function applyFilters() {
   const cat = filter.value;
   const q = search.value.trim().toLowerCase();
   const all = document.querySelectorAll('.card');
-  let visible = 0;
   all.forEach(c => {
     const matchCat = !cat || c.dataset.cat === cat;
     const matchQ = !q || c.dataset.subj.toLowerCase().includes(q);
-    const show = matchCat && matchQ;
-    c.style.display = show ? '' : 'none';
-    if (show) visible++;
+    c.style.display = (matchCat && matchQ) ? '' : 'none';
   });
-  countEl.textContent = (cat || q)
-    ? visible + ' / ' + all.length + ' images'
-    : all.length + ' images';
+  updateCount();
 }
 filter.addEventListener('change', applyFilters);
 search.addEventListener('input', applyFilters);
@@ -341,6 +368,10 @@ function makeCard(item) {
 
   const img = document.createElement('img');
   img.loading = 'lazy';
+  img.decoding = 'async';
+  // width/height attrs let the browser reserve aspect-ratio space,
+  // preventing layout shift when the image decodes.
+  if (item.w && item.h) { img.width = item.w; img.height = item.h; }
   img.src = item.url;
   img.alt = item.subj;
 
@@ -399,6 +430,7 @@ async function pollOnce() {
       else grid.appendChild(card);
       if (it.mtime > latestMtime) latestMtime = it.mtime;
     }
+    totalOnDisk = Math.max(totalOnDisk, data.total || 0);
     applyFilters();
 
     // Preserve visual position when content is prepended above the viewport.
@@ -426,6 +458,74 @@ function setLive(on) {
   liveBtn.classList.toggle('active', on);
 }
 liveBtn.addEventListener('click', () => setLive(!liveOn));
+
+// ---------- Infinite scroll ----------
+let pageLoading = false;
+let pageDone = false;
+let oldestMtime = 0;
+
+(function initOldest() {
+  const cards = document.querySelectorAll('.card');
+  if (!cards.length) { pageDone = true; return; }
+  let m = Infinity;
+  cards.forEach(c => {
+    const v = parseFloat(c.dataset.mtime);
+    if (!isNaN(v) && v < m) m = v;
+  });
+  if (isFinite(m)) oldestMtime = m;
+  if (cards.length >= totalOnDisk) pageDone = true;
+})();
+
+async function loadNextPage() {
+  if (pageLoading || pageDone) return;
+  pageLoading = true;
+  try {
+    const r = await fetch('/api/page?before=' + encodeURIComponent(oldestMtime) + '&limit=200');
+    if (!r.ok) return;
+    const data = await r.json();
+    const items = data.images || [];
+    totalOnDisk = Math.max(totalOnDisk, data.total || 0);
+    if (items.length === 0) {
+      pageDone = true;
+      sentinel.classList.add('done');
+      sentinel.textContent = 'End of gallery — ' + document.querySelectorAll('.card').length + ' loaded.';
+      io.unobserve(sentinel);
+      return;
+    }
+    // Bypass the "new" pulse animation on backfilled cards.
+    const frag = document.createDocumentFragment();
+    for (const it of items) {
+      const card = makeCard(it);
+      card.classList.remove('new');
+      frag.appendChild(card);
+      if (it.mtime < oldestMtime || oldestMtime === 0) oldestMtime = it.mtime;
+    }
+    grid.appendChild(frag);
+    applyFilters();
+    if (document.querySelectorAll('.card').length >= totalOnDisk) {
+      pageDone = true;
+      sentinel.classList.add('done');
+      sentinel.textContent = 'End of gallery — ' + totalOnDisk + ' images.';
+      io.unobserve(sentinel);
+    }
+  } catch (e) {
+    // try again on next intersection
+  } finally {
+    pageLoading = false;
+  }
+}
+
+const io = new IntersectionObserver(entries => {
+  for (const e of entries) {
+    if (e.isIntersecting) loadNextPage();
+  }
+}, { rootMargin: '1500px 0px' });
+
+if (sentinel && !pageDone) io.observe(sentinel);
+else if (sentinel) {
+  sentinel.classList.add('done');
+  sentinel.textContent = 'End of gallery.';
+}
 
 // ---------- Lightbox slideshow ----------
 const SLIDESHOW_MS = 4000;
@@ -496,61 +596,105 @@ document.addEventListener('keydown', e => {
 """
 
 
+_INDEX_CACHE: dict = {"dir_mtime": -1.0, "items": []}
+
+
 def list_images() -> list[dict]:
-    """Walk OUTPUT_DIR and return image records sorted newest-first."""
+    """Walk OUTPUT_DIR and return image records sorted newest-first.
+
+    Cached by directory mtime — adding/removing a file in OUTPUT_DIR
+    bumps its mtime, so a fresh walk runs only when the contents have
+    changed. With 20k+ files this avoids re-reading 20k JSON sidecars
+    on every page hit and every 5 s live-feed poll.
+    """
     if not OUTPUT_DIR.exists():
         return []
-    pngs = sorted(OUTPUT_DIR.glob("*.png"), key=lambda p: p.stat().st_mtime, reverse=True)
+    dir_mtime = OUTPUT_DIR.stat().st_mtime
+    if _INDEX_CACHE["dir_mtime"] == dir_mtime:
+        return _INDEX_CACHE["items"]
+
+    entries = []
+    with os.scandir(OUTPUT_DIR) as it:
+        for e in it:
+            if e.is_file() and e.name.endswith(".png"):
+                try:
+                    entries.append((e.path, e.name, e.stat().st_mtime))
+                except OSError:
+                    pass
+    entries.sort(key=lambda t: t[2], reverse=True)
+
     items: list[dict] = []
-    for p in pngs:
-        json_p = p.with_suffix(".json")
+    for path, name, mtime in entries:
+        json_p = Path(path).with_suffix(".json")
+        cat, subj, w, h = "?", name.rsplit(".", 1)[0], 0, 0
         try:
             meta = json.loads(json_p.read_text())
             cat = meta.get("category") or "?"
-            subj = meta.get("prompt_subject") or p.stem
+            subj = meta.get("prompt_subject") or subj
+            w = int(meta.get("width") or 0)
+            h = int(meta.get("height") or 0)
         except Exception:
-            cat, subj = "?", p.stem
+            pass
         items.append({
-            "name": p.name,
-            "url": f"/output/{p.name}",
+            "name": name,
+            "url": f"/output/{name}",
             "cat": cat,
             "subj": subj,
-            "mtime": p.stat().st_mtime,
+            "w": w,
+            "h": h,
+            "mtime": mtime,
         })
+
+    _INDEX_CACHE["dir_mtime"] = dir_mtime
+    _INDEX_CACHE["items"] = items
     return items
+
+
+def render_card_html(it: dict) -> str:
+    """One card's HTML — shared by initial render and any future SSR path."""
+    dim_attrs = (
+        f' width="{it["w"]}" height="{it["h"]}"'
+        if it.get("w") and it.get("h")
+        else ""
+    )
+    return (
+        f'<div class="card" '
+        f'data-cat="{html.escape(it["cat"], quote=True)}" '
+        f'data-subj="{html.escape(it["subj"], quote=True)}" '
+        f'data-mtime="{it["mtime"]:.6f}" '
+        f'data-full="{it["url"]}">'
+        f'<img loading="lazy" decoding="async"{dim_attrs} '
+        f'src="{it["url"]}" alt="{html.escape(it["subj"], quote=True)}">'
+        f'<div class="meta"><span class="cat">{html.escape(it["cat"])}</span>'
+        f'<span class="subj">{html.escape(it["subj"])}</span></div>'
+        f"</div>"
+    )
 
 
 def render_index() -> str:
     items = list_images()
+    total = len(items)
     if not items and not OUTPUT_DIR.exists():
         return (
             PAGE.replace("__N__", "0")
+            .replace("__TOTAL__", "0")
             .replace("__OPTIONS__", "")
             .replace("__CARDS__", '<div class="empty">No output/ directory yet.</div>')
         )
 
-    cats: set[str] = set()
-    cards: list[str] = []
-    for it in items:
-        cats.add(it["cat"])
-        cards.append(
-            f'<div class="card" '
-            f'data-cat="{html.escape(it["cat"], quote=True)}" '
-            f'data-subj="{html.escape(it["subj"], quote=True)}" '
-            f'data-mtime="{it["mtime"]:.6f}" '
-            f'data-full="{it["url"]}">'
-            f'<img loading="lazy" src="{it["url"]}" alt="{html.escape(it["subj"], quote=True)}">'
-            f'<div class="meta"><span class="cat">{html.escape(it["cat"])}</span>'
-            f'<span class="subj">{html.escape(it["subj"])}</span></div>'
-            f"</div>"
-        )
+    # Categories are derived from the full set so the dropdown stays accurate
+    # even though only the first INITIAL_PAGE_SIZE cards ship in the HTML.
+    cats: set[str] = {it["cat"] for it in items}
+    initial = items[:INITIAL_PAGE_SIZE]
+    cards = [render_card_html(it) for it in initial]
 
     options = "\n".join(
         f'<option value="{html.escape(c, quote=True)}">{html.escape(c)}</option>'
         for c in sorted(cats)
     )
     return (
-        PAGE.replace("__N__", str(len(items)))
+        PAGE.replace("__N__", str(len(initial)))
+        .replace("__TOTAL__", str(total))
         .replace("__OPTIONS__", options)
         .replace("__CARDS__", "\n".join(cards) or '<div class="empty">No images yet.</div>')
     )
@@ -565,7 +709,17 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         if self.path.startswith("/api/list"):
             self._serve_list_json()
             return
+        if self.path.startswith("/api/page"):
+            self._serve_page_json()
+            return
         super().do_GET()
+
+    def end_headers(self) -> None:  # noqa: N802 (stdlib name)
+        # Long-lived public cache for static image bytes — file paths embed
+        # a timestamp+seed so they're effectively immutable.
+        if self.path.startswith("/output/"):
+            self.send_header("Cache-Control", "public, max-age=86400, immutable")
+        super().end_headers()
 
     def _send_bytes(self, body: bytes, content_type: str, status: int = 200) -> None:
         self.send_response(status)
@@ -584,6 +738,31 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         all_items = list_images()
         new_items = [it for it in all_items if it["mtime"] > since]
         body = json.dumps({"images": new_items, "total": len(all_items)}).encode("utf-8")
+        self._send_bytes(body, "application/json; charset=utf-8")
+
+    def _serve_page_json(self) -> None:
+        """Older-than cursor pagination for infinite scroll.
+
+        ``before`` is the mtime of the oldest currently-loaded card; the
+        server returns up to ``limit`` items strictly older than that.
+        ``before=0`` (or omitted) means start from the newest.
+        """
+        qs = parse_qs(urlsplit(self.path).query)
+        try:
+            before = float(qs.get("before", ["0"])[0])
+        except (TypeError, ValueError):
+            before = 0.0
+        try:
+            limit = int(qs.get("limit", [str(PAGE_SIZE)])[0])
+        except (TypeError, ValueError):
+            limit = PAGE_SIZE
+        limit = max(1, min(limit, 1000))
+        all_items = list_images()
+        if before <= 0:
+            page = all_items[:limit]
+        else:
+            page = [it for it in all_items if it["mtime"] < before][:limit]
+        body = json.dumps({"images": page, "total": len(all_items)}).encode("utf-8")
         self._send_bytes(body, "application/json; charset=utf-8")
 
     def log_message(self, fmt: str, *args) -> None:  # noqa: N802
