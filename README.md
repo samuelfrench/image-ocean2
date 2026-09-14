@@ -1,6 +1,6 @@
 # image-ocean2
 
-A tiny CLI that generates **super high quality random images locally** on an RTX 4090 using SDXL (base + refiner), Juggernaut-XL v9, or FLUX.1-schnell. Mostly fun prompts, some serious, all PG.
+A tiny CLI that generates **super high quality random images locally** on an RTX 4090 using SDXL (base + refiner), Juggernaut X v10, or FLUX.1-schnell. Mostly fun prompts, some serious, all PG.
 
 No cloud API keys. No subscriptions. Just your GPU and a checkpoint file.
 
@@ -51,10 +51,10 @@ Checkpoints are not bundled — they're multi-gigabyte files. The script expects
 | ---------------- | -------------------------------------------------- | ------ | ---------------------------------- |
 | `sdxl-refined`   | `sd_xl_base_1.0.safetensors` + `sd_xl_refiner_1.0.safetensors` | 6.5 + 5.7 GB | **Default.** Best classic SDXL quality. |
 | `sdxl-base`      | `sd_xl_base_1.0.safetensors`                       | 6.5 GB | Faster, slightly less polished.    |
-| `juggernaut`     | `Juggernaut-XL_v9_RunDiffusionPhoto_v2.safetensors`| 6.7 GB | Photoreal SDXL fine-tune.          |
+| `juggernaut`     | `Juggernaut-X-v10_RunDiffusion.safetensors`| 6.6 GB | Photoreal SDXL fine-tune (v10).    |
 | `flux`           | `black-forest-labs/FLUX.1-schnell` (HF cache)      | ~33 GB | Different aesthetic, slower (CPU offload on 24 GB). |
 
-Grab SDXL base + refiner from Hugging Face (`stabilityai/stable-diffusion-xl-base-1.0` and `stabilityai/stable-diffusion-xl-refiner-1.0`), Juggernaut-XL from Civitai, FLUX from `black-forest-labs/FLUX.1-schnell`.
+Grab SDXL base + refiner from Hugging Face (`stabilityai/stable-diffusion-xl-base-1.0` and `stabilityai/stable-diffusion-xl-refiner-1.0`), Juggernaut X v10 from Hugging Face (`RunDiffusion/Juggernaut-X-v10`), FLUX from `black-forest-labs/FLUX.1-schnell`.
 
 ## Install
 
@@ -84,7 +84,7 @@ python generate.py --category whimsical --count 3
 # Custom prompt (quality suffix + negative prompt are still applied)
 python generate.py --prompt "a fox reading a book in a mossy forest"
 
-# Photoreal with Juggernaut-XL
+# Photoreal with Juggernaut X v10
 python generate.py --model juggernaut --count 2
 
 # FLUX.1-schnell (slower on 24 GB, but a different look)
@@ -175,4 +175,4 @@ Model load adds one-off overhead (~3–8 s for SDXL, ~60 s+ for FLUX). The fp16-
 
 ## License
 
-MIT. The prompt bank and this code are free to use; model weights have their own licenses (SDXL 1.0 CreativeML Open RAIL++-M, Juggernaut-XL non-commercial, FLUX-schnell Apache 2.0) — please respect them.
+MIT. The prompt bank and this code are free to use; model weights have their own licenses (SDXL 1.0 CreativeML Open RAIL++-M, Juggernaut X CreativeML Open RAIL-M, FLUX-schnell Apache 2.0) — please respect them.

@@ -63,6 +63,8 @@ KNOWN_CATEGORIES = [
 KNOWN_MODELS = ["sdxl-refined", "sdxl-base", "juggernaut", "flux"]
 
 # How a model name maps to its checkpoint identifier in the JSON sidecar.
+# Historical: every pre-2026-09-14 `juggernaut` image used v9. generate.py now
+# writes Juggernaut-X-v10_RunDiffusion.safetensors for new renders.
 MODEL_REPO = {
     "sdxl-refined": "sd_xl_base_1.0.safetensors + sd_xl_refiner_1.0.safetensors",
     "sdxl-base": "sd_xl_base_1.0.safetensors",

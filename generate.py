@@ -4,7 +4,7 @@
 Pipelines supported:
   * sdxl-refined  (default)  SDXL 1.0 base → SDXL 1.0 refiner — highest classic SDXL quality
   * sdxl-base                SDXL 1.0 base only — faster, still great
-  * juggernaut               Juggernaut-XL v9 photoreal fine-tune — best for photoreal
+  * juggernaut               Juggernaut X v10 photoreal fine-tune — best for photoreal
   * flux                     FLUX.1-schnell — modern, different aesthetic, slower w/ CPU offload
 
 Checkpoints are discovered relative to --models-root (default: ../ComfyUI/models).
@@ -113,8 +113,8 @@ def resolve_checkpoints(models_root: Path, model: str) -> dict[str, Path]:
     if model == "juggernaut":
         return {
             "base": _must_exist(
-                ckpt_dir / "Juggernaut-XL_v9_RunDiffusionPhoto_v2.safetensors",
-                "Juggernaut-XL v9",
+                ckpt_dir / "Juggernaut-X-v10_RunDiffusion.safetensors",
+                "Juggernaut X v10",
             )
         }
     if model == "flux":
@@ -250,7 +250,7 @@ def load_pipelines(model: str, ckpts: dict[str, Path], dtype: torch.dtype) -> di
     elif model == "juggernaut":
         print("[load] fp16-fix VAE…", flush=True)
         vae = _load_fp16_fix_vae(dtype)
-        print("[load] Juggernaut-XL v9…", flush=True)
+        print("[load] Juggernaut X v10…", flush=True)
         base = _load_sdxl_single_file(ckpts["base"], dtype, vae=vae)
         _apply_sdxl_quality_upgrades(base)
         pipes["base"] = base

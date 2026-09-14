@@ -7,6 +7,7 @@
 - [ ] Add a small sample grid to `samples/` so the README has reference outputs committed to the repo.
 
 ## Done
+- [x] 2026-09-14 — `--model juggernaut` now loads Juggernaut X v10 (`Juggernaut-X-v10_RunDiffusion.safetensors`, HF `RunDiffusion/Juggernaut-X-v10`). `backfill_attribution.py` still maps historical `juggernaut` files to v9.
 - [x] 2026-04-20 — Initial project: `prompts.py`, `generate.py`, README, requirements, .gitignore.
 - [x] 2026-04-20 — SDXL base + refiner two-stage pipeline at 5.3s / 1024×1024 on RTX 4090.
 - [x] 2026-04-20 — Juggernaut-XL v9 and FLUX.1-schnell pipelines wired behind `--model` flag.
