@@ -15,6 +15,21 @@
     "test": null
   },
   {
+    "path": "docs/todo/data/hf-dataset-upload.md",
+    "slug": "hf-dataset-upload",
+    "title": "Publish the 82k-image archive as a Hugging Face dataset",
+    "status": "now",
+    "area": "data",
+    "due": null,
+    "updated": "2026-10-03",
+    "owner": "agent",
+    "brief": "Restore the S3 Glacier archive, score, shard to Parquet and publish samfrench9/image-ocean2-sdxl-82k (CC0)",
+    "refs": [
+      "scripts/hf_dataset/"
+    ],
+    "test": null
+  },
+  {
     "path": "docs/todo/docs/readme-sample-grid.md",
     "slug": "readme-sample-grid",
     "title": "Sample grid in samples/ for the README",
