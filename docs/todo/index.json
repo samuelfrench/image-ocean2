@@ -1,0 +1,64 @@
+[
+  {
+    "path": "docs/todo/cli/batch-size-flag.md",
+    "slug": "batch-size-flag",
+    "title": "--batch-size flag for N variations per prompt",
+    "status": "idea",
+    "area": "cli",
+    "due": null,
+    "updated": "2026-10-03",
+    "owner": "agent",
+    "brief": "Optional: N variations per prompt while keeping the seed + index schedule",
+    "refs": [
+      "generate.py"
+    ],
+    "test": null
+  },
+  {
+    "path": "docs/todo/docs/readme-sample-grid.md",
+    "slug": "readme-sample-grid",
+    "title": "Sample grid in samples/ for the README",
+    "status": "next",
+    "area": "docs",
+    "due": null,
+    "updated": "2026-10-03",
+    "owner": "agent",
+    "brief": "Commit a small sample grid to samples/ so the README shows reference outputs",
+    "refs": [
+      "README.md",
+      ".gitignore"
+    ],
+    "test": null
+  },
+  {
+    "path": "docs/todo/models/flux-dev-pipeline.md",
+    "slug": "flux-dev-pipeline",
+    "title": "FLUX.1-dev pipeline",
+    "status": "idea",
+    "area": "models",
+    "due": null,
+    "updated": "2026-10-03",
+    "owner": "agent",
+    "brief": "Optional: FLUX.1-dev (non-schnell) for higher FLUX quality at the cost of speed",
+    "refs": [
+      "generate.py",
+      "README.md"
+    ],
+    "test": null
+  },
+  {
+    "path": "docs/todo/models/sdxl-lora-support.md",
+    "slug": "sdxl-lora-support",
+    "title": "SDXL LoRA support",
+    "status": "idea",
+    "area": "models",
+    "due": null,
+    "updated": "2026-10-03",
+    "owner": "agent",
+    "brief": "Optional: --lora <file.safetensors> --lora-weight 0.8 for the SDXL-based pipelines",
+    "refs": [
+      "generate.py"
+    ],
+    "test": null
+  }
+]

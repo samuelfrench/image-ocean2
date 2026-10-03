@@ -1,0 +1,41 @@
+name: todo
+
+# TODO.md and docs/todo/index.json are generated from docs/todo/<area>/<slug>.md by
+# scripts/todo/build.mjs (rules: docs/todo/README.md). This job fails on a hand-edited or stale
+# TODO.md, an invalid task file, or a done task outside docs/todo/done/.
+#
+# GitHub-hosted runner on purpose: this repo is public, and a self-hosted runner would let any fork
+# pull request execute code on the owner's machine. Do not switch to self-hosted.
+
+on:
+  push:
+    paths:
+      - 'TODO.md'
+      - 'docs/todo/**'
+      - 'scripts/todo/**'
+      - '.github/workflows/todo.yml'
+  pull_request:
+    paths:
+      - 'TODO.md'
+      - 'docs/todo/**'
+      - 'scripts/todo/**'
+      - '.github/workflows/todo.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  todo:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Test the TODO tooling
+        run: node --test scripts/todo/__tests__/*.test.mjs
+      - name: Check TODO.md and docs/todo/index.json are current
+        run: node scripts/todo/build.mjs --check

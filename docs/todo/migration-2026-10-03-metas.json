@@ -1,0 +1,92 @@
+[
+  {
+    "heading": null,
+    "disposition": "archive",
+    "reason": "Old file title line only; the generated TODO.md carries its own title"
+  },
+  {
+    "heading": "## Open",
+    "disposition": "split",
+    "reason": "Four independent items; the three 'Optional:' items become ideas, the sample grid is agent-doable now"
+  },
+  {
+    "heading": "## Open",
+    "from": true,
+    "lines": [1, 2],
+    "slug": "sdxl-lora-support",
+    "title": "SDXL LoRA support",
+    "status": "idea",
+    "area": "models",
+    "due": null,
+    "updated": "2026-10-03",
+    "owner": "agent",
+    "brief": "Optional: --lora <file.safetensors> --lora-weight 0.8 for the SDXL-based pipelines",
+    "refs": ["generate.py"],
+    "test": null,
+    "summary": [
+      "**What:** add `--lora path.safetensors --lora-weight 0.8` to `generate.py` so the SDXL-based pipelines (`sdxl-refined`, `sdxl-base`, `juggernaut`) can load one LoRA.",
+      "**Why:** optional; listed as an open idea in the hand-maintained TODO.md before 2026-10-03. No measured need recorded.",
+      "**Next:** in `load_pipelines()` (generate.py @ bc8555b line 227), load the LoRA after `_apply_sdxl_quality_upgrades()`; record the LoRA file and weight in the JSON sidecar so attribution stays complete. Decide whether `flux` rejects the flag or supports FLUX LoRAs."
+    ]
+  },
+  {
+    "heading": "## Open",
+    "from": true,
+    "lines": [3, 3],
+    "slug": "batch-size-flag",
+    "title": "--batch-size flag for N variations per prompt",
+    "status": "idea",
+    "area": "cli",
+    "due": null,
+    "updated": "2026-10-03",
+    "owner": "agent",
+    "brief": "Optional: N variations per prompt while keeping the seed + index schedule",
+    "refs": ["generate.py"],
+    "test": null,
+    "summary": [
+      "**What:** add `--batch-size N` to `generate.py` to produce N variations of one prompt with the same seed schedule.",
+      "**Why:** optional; listed as an open idea in the hand-maintained TODO.md before 2026-10-03. No measured need recorded.",
+      "**Next:** keep the existing `--seed` contract (`Base seed. Each image gets seed + index.`) so a batch is reproducible; check 24 GB VRAM headroom per model before batching on-device (FLUX already needs sequential CPU offload)."
+    ]
+  },
+  {
+    "heading": "## Open",
+    "from": true,
+    "lines": [4, 4],
+    "slug": "flux-dev-pipeline",
+    "title": "FLUX.1-dev pipeline",
+    "status": "idea",
+    "area": "models",
+    "due": null,
+    "updated": "2026-10-03",
+    "owner": "agent",
+    "brief": "Optional: FLUX.1-dev (non-schnell) for higher FLUX quality at the cost of speed",
+    "refs": ["generate.py", "README.md"],
+    "test": null,
+    "summary": [
+      "**What:** add a `--model` choice that loads FLUX.1-dev instead of FLUX.1-schnell.",
+      "**Why:** optional; higher FLUX quality at the cost of speed. The README records `flux` (schnell) at ~16 s / image with sequential CPU offload on 24 GB.",
+      "**Next:** add a branch beside the `flux` branch in `load_pipelines()`, measure s/image on the RTX 4090, and check the FLUX.1-dev license before use (it differs from schnell's Apache 2.0); update the README model table and license line."
+    ]
+  },
+  {
+    "heading": "## Open",
+    "from": true,
+    "lines": [5, 5],
+    "slug": "readme-sample-grid",
+    "title": "Sample grid in samples/ for the README",
+    "status": "next",
+    "area": "docs",
+    "due": null,
+    "updated": "2026-10-03",
+    "owner": "agent",
+    "brief": "Commit a small sample grid to samples/ so the README shows reference outputs",
+    "refs": ["README.md", ".gitignore"],
+    "test": null,
+    "summary": [
+      "**What:** commit a small grid of reference outputs to `samples/` and show it in the README.",
+      "**Why:** the README describes the quality stack and models but commits no example output; `samples/` does not exist yet (checked 2026-10-03).",
+      "**Next:** pick one image per model or category from `output/`, visually QA each, save as JPEG under `samples/` (`.gitignore` already allows `samples/*.png` and `samples/*.jpg`), keep the total small, and link it from the README."
+    ]
+  }
+]
