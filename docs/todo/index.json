@@ -15,6 +15,23 @@
     "test": null
   },
   {
+    "path": "docs/todo/data/verify-hf-copy-cleanup.md",
+    "slug": "verify-hf-copy-cleanup",
+    "title": "Verify the Hugging Face transfer before cleaning up the archive copy",
+    "status": "now",
+    "area": "data",
+    "due": null,
+    "updated": "2026-10-04",
+    "owner": "agent",
+    "brief": "Verify all 165 image shards and source mappings; delete only confirmed copies and retain every excluded or unmatched object",
+    "refs": [
+      "docs/todo/done/data/hf-dataset-upload.md",
+      "scripts/hf_dataset/build_shards.py",
+      "https://huggingface.co/datasets/samfrench9/image-ocean2-sdxl-82k"
+    ],
+    "test": null
+  },
+  {
     "path": "docs/todo/docs/readme-sample-grid.md",
     "slug": "readme-sample-grid",
     "title": "Sample grid in samples/ for the README",
