@@ -21,3 +21,5 @@ test: null
 - **Done when:** verification passes, scoped deletion is confirmed by a fresh inventory, retained exclusions/unmatched objects are counted with reasons, and the global TODO/shared memory agree with current evidence.
 
 - **Payload gate launched (2026-10-04):** bounded four-worker verification downloads each immutable shard, compares its full bytes with the Hub LFS checksum, compares every ordered row and all recipe fields with final metadata, and decodes every image. It saves resumable private per-shard evidence and fails closed; no source deletion before all 165 shards / 82,481 images and all five recovery IDs pass. The local verifier passed seven meaningful synthetic checks before launch.
+
+- **Mid-run checkpoint (2026-10-04T15:22:47.049863+00:00):** 88 shards / 44,000 decoded images / 44,713,344,546 bytes passed; all five previously failed source images were independently downloaded and decoded from the Hub. Zero errors; no source deletion.
