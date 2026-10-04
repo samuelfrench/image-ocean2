@@ -155,8 +155,10 @@ def main() -> None:
         .agg(images=("id", "size"), prompts=("prompt_id", "nunique"), median_aesthetic=("laion_aesthetic", "median"))
         .sort_values("images", ascending=False)
     )
+    # itertuples keeps per-column dtypes; iterrows upcasts the int counts to float ("18,571.0").
     cat_rows = "\n".join(
-        f"| {c} | {r.images:,} | {r.prompts} | {r.median_aesthetic:.2f} |" for c, r in cats.iterrows()
+        f"| {r.Index} | {int(r.images):,} | {int(r.prompts):,} | {r.median_aesthetic:.2f} |"
+        for r in cats.itertuples()
     )
     sizes = m.groupby(["width", "height"]).size().sort_values(ascending=False)
     size_rows = "\n".join(f"| {w} × {h} | {n:,} |" for (w, h), n in sizes.items())
@@ -164,7 +166,8 @@ def main() -> None:
     v2 = m[m["pipeline_version"] == 2]
     spread_med = float((spread["p90"] - spread["p10"]).median())
     ex = report["excluded_counts"]
-    gb = report["shard_bytes"] / 1e9
+    # GiB, labelled "GB" to match the Hub's own size display (81.3e9 bytes -> "~76 GB").
+    gb = report["shard_bytes"] / 2**30
     first, last = m["created_at"].min()[:10], m["created_at"].max()[:10]
     n = len(m)
 
@@ -224,7 +227,7 @@ Seed choice alone moves the aesthetic score a lot. Across the {len(spread)} prom
 ```python
 from datasets import load_dataset
 
-# stream without downloading all {gb:.0f} GB
+# stream without downloading all ~{gb:.0f} GB
 ds = load_dataset("{args.repo_id}", split="train", streaming=True)
 row = next(iter(ds))
 row["image"]          # PIL.Image, lossless
