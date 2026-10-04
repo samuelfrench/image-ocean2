@@ -39,7 +39,7 @@
     "due": null,
     "updated": "2026-10-04",
     "owner": "agent",
-    "brief": "Source mappings and 82,481 metadata rows verified; All 165 shards / 82,481 images verified; scoped source deletion awaits fresh live inventory checks",
+    "brief": "Source mappings and 82,481 metadata rows verified; Full transfer verified; first delete request rejected with 1,000 NotImplemented errors, zero objects deleted",
     "refs": [
       "docs/todo/done/data/hf-dataset-upload.md",
       "scripts/hf_dataset/build_shards.py",
