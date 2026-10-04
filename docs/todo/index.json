@@ -39,7 +39,7 @@
     "due": null,
     "updated": "2026-10-04",
     "owner": "agent",
-    "brief": "Source mappings and 82,481 metadata rows verified; Full transfer verified; corrected current-object conditional cleanup is restarting after a zero-mutation API rejection",
+    "brief": "Source mappings and 82,481 metadata rows verified; Full transfer verified; corrected cleanup has confirmed 100,000 / 164,847 object deletions, final retained verification pending",
     "refs": [
       "docs/todo/done/data/hf-dataset-upload.md",
       "scripts/hf_dataset/build_shards.py",

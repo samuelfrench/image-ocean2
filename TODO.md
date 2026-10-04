@@ -6,7 +6,7 @@
 
 ## Now
 
-- [ ] Verify the Hugging Face transfer before cleaning up the archive copy — Source mappings and 82,481 metadata rows verified; Full transfer verified; corrected current-object conditional cleanup is restarting after a zero-mutation API rejection · _data_ · [details](docs/todo/data/verify-hf-copy-cleanup.md)
+- [ ] Verify the Hugging Face transfer before cleaning up the archive copy — Source mappings and 82,481 metadata rows verified; Full transfer verified; corrected cleanup has confirmed 100,000 / 164,847 object deletions, final retained verification pending · _data_ · [details](docs/todo/data/verify-hf-copy-cleanup.md)
 
 ## Waiting on Sam
 

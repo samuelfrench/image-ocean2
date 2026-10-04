@@ -5,7 +5,7 @@ area: data
 due: null
 updated: 2026-10-04
 owner: agent
-brief: "Source mappings and 82,481 metadata rows verified; Full transfer verified; corrected current-object conditional cleanup is restarting after a zero-mutation API rejection"
+brief: "Source mappings and 82,481 metadata rows verified; Full transfer verified; corrected cleanup has confirmed 100,000 / 164,847 object deletions, final retained verification pending"
 refs:
   - "docs/todo/done/data/hf-dataset-upload.md"
   - "scripts/hf_dataset/build_shards.py"
@@ -29,3 +29,5 @@ test: null
 - **Provider gate failure (2026-10-04):** fresh whole-prefix current/version snapshots and unchanged Hub identity passed. The first 1,000-object conditional delete request combined an explicit null version ID with an ETag and returned `NotImplemented` for every entry, with zero deleted entries. Dedicated stopped inventories match every original object identity, count and byte total; no source mutation occurred. Preserve the failed request/response evidence. Adjust the request format for the strictly unversioned source bucket, retaining conditional content checks, and rerun all live preflight/final-retained gates. This is an API-format rejection, not a transfer gap.
 
 - **Request correction reviewed (2026-10-04):** the strictly unversioned source uses current-object Key+ETag conditional requests without a version-ID field, matching the AWS documented request format. Original null-version rejection and unchanged inventories remain preserved; a separate compatibility gate requires all 1,000 errors/zero deletions and exact unchanged stopped inventories. Compile, 20 offline mock guard checks and root review passed. Full source/Hub/payload/versioning/retained gates remain required before/after cleanup; no unconditional deletion fallback or provider settings change.
+
+- **Deletion checkpoint (2026-10-04):** corrected current-object ETag requests accepted after fresh full source/version/Hub preflight; 100,000 objects / 65,495,082,760 bytes durably confirmed deleted at this checkpoint. The retained manifest is excluded from all batches. Final exact retained identities/count/size and absence of eligible versions/delete markers remain pending.
