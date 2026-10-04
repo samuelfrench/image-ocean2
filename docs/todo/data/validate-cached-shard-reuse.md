@@ -8,11 +8,11 @@ owner: agent
 brief: "Reproducer: an existing one-row shard retains stale-id when the requested row is intended-new-id; verify IDs before reuse"
 refs:
   - "scripts/hf_dataset/build_shards.py:134"
-  - "docs/todo/data/verify-hf-copy-cleanup.md"
+  - "docs/todo/done/data/verify-hf-copy-cleanup.md"
 test: null
 ---
 
-- **Measured defect (2026-10-04):** `scripts/hf_dataset/build_shards.py:134` returns an existing shard's row count without checking its IDs, recipe values or build inputs. A temporary 446-byte one-row shard with `id=stale-id` was accepted when `write_shard` requested `id=intended-new-id`; the stale ID remained. Reusing the same shard filenames after exclusions change can preserve old rows. This is a proven local reproducer; it does not establish a defect in the current Hub dataset, whose immutable shards are being independently checked.
+- **Measured defect (2026-10-04):** `scripts/hf_dataset/build_shards.py:134` returns an existing shard's row count without checking its IDs, recipe values or build inputs. A temporary 446-byte one-row shard with `id=stale-id` was accepted when `write_shard` requested `id=intended-new-id`; the stale ID remained. Reusing the same shard filenames after exclusions change can preserve old rows. This is a proven local reproducer; it does not establish a defect in the current Hub dataset, whose 165 immutable shards / 82,481 images all passed independent checksum, row, recipe and decode checks on 2026-10-04.
 - **Reproduce:** from the repo root run the snippet below using the dataset build environment. It only creates and removes a temporary local fixture.
 
 ```python

@@ -26,24 +26,7 @@
     "brief": "Reproducer: an existing one-row shard retains stale-id when the requested row is intended-new-id; verify IDs before reuse",
     "refs": [
       "scripts/hf_dataset/build_shards.py:134",
-      "docs/todo/data/verify-hf-copy-cleanup.md"
-    ],
-    "test": null
-  },
-  {
-    "path": "docs/todo/data/verify-hf-copy-cleanup.md",
-    "slug": "verify-hf-copy-cleanup",
-    "title": "Verify the Hugging Face transfer before cleaning up the archive copy",
-    "status": "now",
-    "area": "data",
-    "due": null,
-    "updated": "2026-10-04",
-    "owner": "agent",
-    "brief": "Source mappings and 82,481 metadata rows verified; Full transfer verified; corrected cleanup has confirmed 100,000 / 164,847 object deletions, final retained verification pending",
-    "refs": [
-      "docs/todo/done/data/hf-dataset-upload.md",
-      "scripts/hf_dataset/build_shards.py",
-      "https://huggingface.co/datasets/samfrench9/image-ocean2-sdxl-82k"
+      "docs/todo/done/data/verify-hf-copy-cleanup.md"
     ],
     "test": null
   },
@@ -75,6 +58,23 @@
     "brief": "Done 2026-10-04: samfrench9/image-ocean2-sdxl-82k public (82,481 images, CC0, ~76 GB), Viewer renders, anonymous streaming verified, README linked",
     "refs": [
       "scripts/hf_dataset/",
+      "https://huggingface.co/datasets/samfrench9/image-ocean2-sdxl-82k"
+    ],
+    "test": null
+  },
+  {
+    "path": "docs/todo/done/data/verify-hf-copy-cleanup.md",
+    "slug": "verify-hf-copy-cleanup",
+    "title": "Verify the Hugging Face transfer before cleaning up the archive copy",
+    "status": "done",
+    "area": "data",
+    "due": null,
+    "updated": "2026-10-04",
+    "owner": "agent",
+    "brief": "Verified 165 shards / 82,481 images; deleted 164,847 represented source objects, retained 135 excluded/unmatched/detail sidecars",
+    "refs": [
+      "docs/todo/done/data/hf-dataset-upload.md",
+      "scripts/hf_dataset/build_shards.py",
       "https://huggingface.co/datasets/samfrench9/image-ocean2-sdxl-82k"
     ],
     "test": null
