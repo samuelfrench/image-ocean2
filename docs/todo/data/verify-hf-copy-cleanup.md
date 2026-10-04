@@ -5,7 +5,7 @@ area: data
 due: null
 updated: 2026-10-04
 owner: agent
-brief: "Source mappings and 82,481 metadata rows verified; full image-shard checks pending, no archive deletion"
+brief: "Source mappings and 82,481 metadata rows verified; full image-shard download/checksum/decode running, no archive deletion"
 refs:
   - "docs/todo/done/data/hf-dataset-upload.md"
   - "scripts/hf_dataset/build_shards.py"
@@ -19,3 +19,5 @@ test: null
 - **Verification approach:** sparse HTTP reads of all recipe columns triggered Hub rate limiting after 20 shards in about 120 seconds. Use bounded full-shard reads with declared-size/checksum checks, row comparisons and image decoding instead; retain private resumable evidence.
 - **Next:** verify every shard is present and readable; compare its rows with final metadata and the source inventory; reconcile all early failed downloads. Stop before deletion on any real transfer gap. Delete only source objects represented on the Hub, preserving deliberate exclusions and anything unmatched; handle versions and delete markers if present. Record measured retained/deleted counts and sizes and archive minimum-duration billing effects in the private operational record.
 - **Done when:** verification passes, scoped deletion is confirmed by a fresh inventory, retained exclusions/unmatched objects are counted with reasons, and the global TODO/shared memory agree with current evidence.
+
+- **Payload gate launched (2026-10-04):** bounded four-worker verification downloads each immutable shard, compares its full bytes with the Hub LFS checksum, compares every ordered row and all recipe fields with final metadata, and decodes every image. It saves resumable private per-shard evidence and fails closed; no source deletion before all 165 shards / 82,481 images and all five recovery IDs pass. The local verifier passed seven meaningful synthetic checks before launch.
