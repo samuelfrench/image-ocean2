@@ -15,6 +15,22 @@
     "test": null
   },
   {
+    "path": "docs/todo/data/validate-cached-shard-reuse.md",
+    "slug": "validate-cached-shard-reuse",
+    "title": "Validate cached shard IDs before reusing a dataset rebuild",
+    "status": "next",
+    "area": "data",
+    "due": null,
+    "updated": "2026-10-04",
+    "owner": "agent",
+    "brief": "Reproducer: an existing one-row shard retains stale-id when the requested row is intended-new-id; verify IDs before reuse",
+    "refs": [
+      "scripts/hf_dataset/build_shards.py:134",
+      "docs/todo/data/verify-hf-copy-cleanup.md"
+    ],
+    "test": null
+  },
+  {
     "path": "docs/todo/data/verify-hf-copy-cleanup.md",
     "slug": "verify-hf-copy-cleanup",
     "title": "Verify the Hugging Face transfer before cleaning up the archive copy",
