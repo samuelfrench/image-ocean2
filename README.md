@@ -4,6 +4,10 @@ A tiny CLI that generates **super high quality random images locally** on an RTX
 
 No cloud API keys. No subscriptions. Just your GPU and a checkpoint file.
 
+By Sam French — [samfrenchblog.com](https://samfrenchblog.com)
+
+**Dataset:** 82,481 SDXL images made with this tool are public on Hugging Face as [samfrench9/image-ocean2-sdxl-82k](https://huggingface.co/datasets/samfrench9/image-ocean2-sdxl-82k) (CC0, ~76 GB, every image with its full generation recipe).
+
 ## Quality stack
 
 Every SDXL-based pipeline (`sdxl-refined`, `sdxl-base`, `juggernaut`) runs through:

@@ -6,7 +6,7 @@
 
 ## Now
 
-- [ ] Publish the 82k-image archive as a Hugging Face dataset — Restore the S3 Glacier archive, score, shard to Parquet and publish samfrench9/image-ocean2-sdxl-82k (CC0) · _data_ · [details](docs/todo/data/hf-dataset-upload.md)
+- [ ] Publish the 82k-image archive as a Hugging Face dataset — Public since 2026-10-04 (82,481 images, CC0, ~76 GB); README linked; confirm the Dataset Viewer finishes rendering · _data_ · [details](docs/todo/data/hf-dataset-upload.md)
 
 ## Waiting on Sam
 

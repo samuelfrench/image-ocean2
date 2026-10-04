@@ -21,11 +21,12 @@
     "status": "now",
     "area": "data",
     "due": null,
-    "updated": "2026-10-03",
+    "updated": "2026-10-04",
     "owner": "agent",
-    "brief": "Restore the S3 Glacier archive, score, shard to Parquet and publish samfrench9/image-ocean2-sdxl-82k (CC0)",
+    "brief": "Public since 2026-10-04 (82,481 images, CC0, ~76 GB); README linked; confirm the Dataset Viewer finishes rendering",
     "refs": [
-      "scripts/hf_dataset/"
+      "scripts/hf_dataset/",
+      "https://huggingface.co/datasets/samfrench9/image-ocean2-sdxl-82k"
     ],
     "test": null
   },
