@@ -5,7 +5,7 @@ area: data
 due: null
 updated: 2026-10-04
 owner: agent
-brief: "Source mappings and 82,481 metadata rows verified; full image-shard download/checksum/decode running, no archive deletion"
+brief: "Source mappings and 82,481 metadata rows verified; All 165 shards / 82,481 images verified; scoped source deletion awaits fresh live inventory checks"
 refs:
   - "docs/todo/done/data/hf-dataset-upload.md"
   - "scripts/hf_dataset/build_shards.py"
@@ -23,3 +23,5 @@ test: null
 - **Payload gate launched (2026-10-04):** bounded four-worker verification downloads each immutable shard, compares its full bytes with the Hub LFS checksum, compares every ordered row and all recipe fields with final metadata, and decodes every image. It saves resumable private per-shard evidence and fails closed; no source deletion before all 165 shards / 82,481 images and all five recovery IDs pass. The local verifier passed seven meaningful synthetic checks before launch.
 
 - **Mid-run checkpoint (2026-10-04T15:22:47.049863+00:00):** 88 shards / 44,000 decoded images / 44,713,344,546 bytes passed; all five previously failed source images were independently downloaded and decoded from the Hub. Zero errors; no source deletion.
+
+- **Payload gate PASSED (2026-10-04):** all 165 shards / 81,323,516,544 bytes downloaded at the immutable Hub revision and matched declared size/LFS SHA256; all 82,481 unique images decoded with matching dimensions/path and every ordered recipe row matched all 30 metadata fields. All five logged failed downloads independently decoded on the Hub. No missing/unexpected/duplicate image IDs and no excluded image IDs present. The local cleanup plan maps every source object, retains 135 objects / 13,408,223 bytes, and permits deletion of 164,847 verified represented objects / 105,042,349,293 bytes only after a fresh live source/Hub comparison. Cleanup verifier passed 13 offline guard/response/journal checks and root review; no deletion at this checkpoint.

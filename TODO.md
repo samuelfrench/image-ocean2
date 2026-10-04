@@ -6,7 +6,7 @@
 
 ## Now
 
-- [ ] Verify the Hugging Face transfer before cleaning up the archive copy — Source mappings and 82,481 metadata rows verified; full image-shard download/checksum/decode running, no archive deletion · _data_ · [details](docs/todo/data/verify-hf-copy-cleanup.md)
+- [ ] Verify the Hugging Face transfer before cleaning up the archive copy — Source mappings and 82,481 metadata rows verified; All 165 shards / 82,481 images verified; scoped source deletion awaits fresh live inventory checks · _data_ · [details](docs/todo/data/verify-hf-copy-cleanup.md)
 
 ## Waiting on Sam
 
