@@ -23,7 +23,7 @@
     "due": null,
     "updated": "2026-10-04",
     "owner": "agent",
-    "brief": "Verify all 165 image shards and source mappings; delete only confirmed copies and retain every excluded or unmatched object",
+    "brief": "Source mappings and 82,481 metadata rows verified; full image-shard checks pending, no archive deletion",
     "refs": [
       "docs/todo/done/data/hf-dataset-upload.md",
       "scripts/hf_dataset/build_shards.py",
