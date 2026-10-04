@@ -15,22 +15,6 @@
     "test": null
   },
   {
-    "path": "docs/todo/data/hf-dataset-upload.md",
-    "slug": "hf-dataset-upload",
-    "title": "Publish the 82k-image archive as a Hugging Face dataset",
-    "status": "now",
-    "area": "data",
-    "due": null,
-    "updated": "2026-10-04",
-    "owner": "agent",
-    "brief": "Public since 2026-10-04 (82,481 images, CC0, ~76 GB); README linked; confirm the Dataset Viewer finishes rendering",
-    "refs": [
-      "scripts/hf_dataset/",
-      "https://huggingface.co/datasets/samfrench9/image-ocean2-sdxl-82k"
-    ],
-    "test": null
-  },
-  {
     "path": "docs/todo/docs/readme-sample-grid.md",
     "slug": "readme-sample-grid",
     "title": "Sample grid in samples/ for the README",
@@ -43,6 +27,22 @@
     "refs": [
       "README.md",
       ".gitignore"
+    ],
+    "test": null
+  },
+  {
+    "path": "docs/todo/done/data/hf-dataset-upload.md",
+    "slug": "hf-dataset-upload",
+    "title": "Publish the 82k-image archive as a Hugging Face dataset",
+    "status": "done",
+    "area": "data",
+    "due": null,
+    "updated": "2026-10-04",
+    "owner": "agent",
+    "brief": "Done 2026-10-04: samfrench9/image-ocean2-sdxl-82k public (82,481 images, CC0, ~76 GB), Viewer renders, anonymous streaming verified, README linked",
+    "refs": [
+      "scripts/hf_dataset/",
+      "https://huggingface.co/datasets/samfrench9/image-ocean2-sdxl-82k"
     ],
     "test": null
   },

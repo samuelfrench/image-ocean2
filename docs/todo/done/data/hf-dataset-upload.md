@@ -1,11 +1,11 @@
 ---
 title: "Publish the 82k-image archive as a Hugging Face dataset"
-status: now
+status: done
 area: data
 due: null
 updated: 2026-10-04
 owner: agent
-brief: "Public since 2026-10-04 (82,481 images, CC0, ~76 GB); README linked; confirm the Dataset Viewer finishes rendering"
+brief: "Done 2026-10-04: samfrench9/image-ocean2-sdxl-82k public (82,481 images, CC0, ~76 GB), Viewer renders, anonymous streaming verified, README linked"
 refs:
   - "scripts/hf_dataset/"
   - "https://huggingface.co/datasets/samfrench9/image-ocean2-sdxl-82k"
@@ -19,9 +19,10 @@ test: null
 - **Measured on 22 expedited samples (2026-10-03):** lossless WebP method 4 = 0.77× PNG size (≈84 GB for the full set, under the 100 GB free private-storage cap), pixel-identical 22/22 through `datasets.load_dataset`; lossy WebP q95 would be 19 GB but was rejected — lossless originals matter for synthetic-image-detection use. LAION aesthetic 5.79–6.85, `nsfw_prob` ≤ 0.00025 on the samples. A throwaway private repo test of the full upload → `load_dataset(streaming=True)` path passed and was deleted. Archive facts: 82,490 sidecars (2 PNGs have none), 225 prompts, seeds per prompt min 1 / median 338 / max 956, 82,482 images on pipeline v2 with one constant recipe, 115 images with burned-in meme captions.
 - **Published (2026-10-04):** pipeline finished 2026-10-04 03:31 CDT (`REBUILD DONE`, private upload with manual exclusions in `ops/exclude.txt`); card and sample assets QA'd and the card's size/count nits fixed on the Hub; repo made public 2026-10-04 ~09:31 CDT. Verified 09:40 CDT: Hub API `private: False`, 172 files, 165 Parquet shards, 81.3 GB decimal (75.7 GiB, card says ~76 GB), 82,481 rows, license `cc0-1.0`; anonymous download of `metadata/metadata.parquet` works (HTTP 206). README links the dataset and samfrenchblog.com.
 - **Staging cleaned up (2026-10-04):** deleted `~/hf-staging/image-ocean2/png`, `dist` and `dist.prev-20261003` (~268 GB freed; S3 keeps the originals, the Hub keeps the shards). Kept `ops/`, `logs/` (incl. `scores.parquet`), `meta/`, `sample/`, `.venv`. Rebuilding shards now needs a fresh restore + `aws s3 sync` (steps 1–2 of `ops/run_pipeline.sh`).
-- **Open:**
-  - [ ] Dataset Viewer: right after going public, `https://datasets-server.huggingface.co/splits?dataset=samfrench9/image-ocean2-sdxl-82k` showed both configs (`default`, `metadata`) `pending` and `is-valid` all false. Recheck; if a config lands in `failed`, read its error there.
-  - [ ] Anonymous `datasets.load_dataset("samfrench9/image-ocean2-sdxl-82k", split="train", streaming=True)` returning rows with images (only the anonymous file download was checked).
+- **Result (2026-10-04 09:36 CDT):** all "done when" criteria verified live. Dataset Viewer: `is-valid` → `preview/viewer/search/filter: true` (`statistics` still false at that moment), `/splits` lists `default/train` and `metadata/train` with nothing pending or failed, `/first-rows` serves both configs. Anonymous streaming (datasets 5.0.1, `token=False`, `HF_TOKEN` unset, empty `HF_HOME`): `default` → 31 features, 2 rows, images decode as 1024×1024 RGB WebP, no missing fields; `metadata` → 30 features (no `image`), 2 rows, no missing fields. Harmless gotcha: the Python process can print `Fatal Python error: PyGILState_Release` at interpreter shutdown (a background prefetch thread still running after `take(2)`); the rows were already read.
+- **Checklist:**
+  - [x] Dataset Viewer: right after going public, `https://datasets-server.huggingface.co/splits?dataset=samfrench9/image-ocean2-sdxl-82k` showed both configs (`default`, `metadata`) `pending` and `is-valid` all false. Recheck; if a config lands in `failed`, read its error there.
+  - [x] Anonymous `datasets.load_dataset("samfrench9/image-ocean2-sdxl-82k", split="train", streaming=True)` returning rows with images: verified 2026-10-04, see Result.
   - [x] `scripts/hf_dataset/make_card.py` card nits fixed in source (2026-10-04): size now `shard_bytes / 2**30` printed as `~76 GB` (Hub's basis; was `/1e9` → `81 GB`), and the category table uses `itertuples()` with int casts (was `iterrows()` → `18,571.0`). Verified: regenerating from the Hub's `metadata/metadata.parquet` plus a build report rebuilt from Hub file sizes (image tiles stubbed, since `png/` is deleted) produces a README byte-identical to the live Hub card.
 - **Cost:** AWS restore + egress for ~105 GB ≤ ~$15 one-off; restored copies bill at S3 Standard for 14 days (~$1). Hugging Face public storage is free (best-effort).
 - **Done when:** the dataset is public, `datasets.load_dataset(..., streaming=True)` returns rows with images, the Dataset Viewer renders, the card has stats + sample grids, and the repo README links to it.
