@@ -80,6 +80,25 @@
     "test": null
   },
   {
+    "path": "docs/todo/done/service/uncommitted-meme-generator-edits.md",
+    "slug": "uncommitted-meme-generator-edits",
+    "title": "Decide on the uncommitted meme-caption generator edits",
+    "status": "done",
+    "area": "service",
+    "due": null,
+    "updated": "2026-10-17",
+    "owner": "agent",
+    "brief": "Done 2026-10-17: Sam chose discard; the 5 files (+348/-27) were restored to HEAD with git restore, working tree clean",
+    "refs": [
+      "generate.py",
+      "prompts.py",
+      "gallery.py",
+      "README.md",
+      "docs/superpowers/specs/2026-05-02-always-on-service-design.md"
+    ],
+    "test": null
+  },
+  {
     "path": "docs/todo/done/service/zombie-run-cleanup-2026-10-17.md",
     "slug": "zombie-run-cleanup-2026-10-17",
     "title": "Stop the login-enabled generator service and clear its unplanned run",
@@ -139,25 +158,6 @@
     "refs": [
       "generate.py",
       "docs/todo/done/service/zombie-run-cleanup-2026-10-17.md"
-    ],
-    "test": null
-  },
-  {
-    "path": "docs/todo/service/uncommitted-meme-generator-edits.md",
-    "slug": "uncommitted-meme-generator-edits",
-    "title": "Decide on the uncommitted meme-caption generator edits",
-    "status": "waiting-sam",
-    "area": "service",
-    "due": null,
-    "updated": "2026-10-17",
-    "owner": "sam",
-    "brief": "5 files, +348/-27, uncommitted since 2026-05-13 (generate.py touched 2026-09-14): meme default category + post-diffusion top/bottom caption overlay. Commit or discard?",
-    "refs": [
-      "generate.py",
-      "prompts.py",
-      "gallery.py",
-      "README.md",
-      "docs/superpowers/specs/2026-05-02-always-on-service-design.md"
     ],
     "test": null
   }
