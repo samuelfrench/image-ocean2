@@ -80,6 +80,22 @@
     "test": null
   },
   {
+    "path": "docs/todo/done/service/zombie-run-cleanup-2026-10-17.md",
+    "slug": "zombie-run-cleanup-2026-10-17",
+    "title": "Stop the login-enabled generator service and clear its unplanned run",
+    "status": "done",
+    "area": "service",
+    "due": null,
+    "updated": "2026-10-17",
+    "owner": "agent",
+    "brief": "Done 2026-10-17: image-ocean2.service stopped + disabled; its 31 h Oct 16-17 run (21,140 meme PNG + JSON, 23 GB) deleted on Sam's go",
+    "refs": [
+      "generate.py",
+      "docs/superpowers/specs/2026-05-02-always-on-service-design.md"
+    ],
+    "test": null
+  },
+  {
     "path": "docs/todo/models/flux-dev-pipeline.md",
     "slug": "flux-dev-pipeline",
     "title": "FLUX.1-dev pipeline",
@@ -107,6 +123,41 @@
     "brief": "Optional: --lora <file.safetensors> --lora-weight 0.8 for the SDXL-based pipelines",
     "refs": [
       "generate.py"
+    ],
+    "test": null
+  },
+  {
+    "path": "docs/todo/service/forever-run-guard.md",
+    "slug": "forever-run-guard",
+    "title": "Bound --forever runs before the service is ever re-enabled",
+    "status": "idea",
+    "area": "service",
+    "due": null,
+    "updated": "2026-10-17",
+    "owner": "agent",
+    "brief": "Unbounded --forever filled 23 GB in 31 h and held the GPU at 100%; add a max-images/max-bytes cap and a yield-when-GPU-busy check first",
+    "refs": [
+      "generate.py",
+      "docs/todo/done/service/zombie-run-cleanup-2026-10-17.md"
+    ],
+    "test": null
+  },
+  {
+    "path": "docs/todo/service/uncommitted-meme-generator-edits.md",
+    "slug": "uncommitted-meme-generator-edits",
+    "title": "Decide on the uncommitted meme-caption generator edits",
+    "status": "waiting-sam",
+    "area": "service",
+    "due": null,
+    "updated": "2026-10-17",
+    "owner": "sam",
+    "brief": "5 files, +348/-27, uncommitted since 2026-05-13 (generate.py touched 2026-09-14): meme default category + post-diffusion top/bottom caption overlay. Commit or discard?",
+    "refs": [
+      "generate.py",
+      "prompts.py",
+      "gallery.py",
+      "README.md",
+      "docs/superpowers/specs/2026-05-02-always-on-service-design.md"
     ],
     "test": null
   }
